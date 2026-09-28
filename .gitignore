@@ -1,0 +1,32 @@
+# ===== 不上傳的檔案 =====
+
+# --- 憑證 / 個資（最重要）---
+# Google Drive 捷徑（含個人 Gmail 與真實試算表 ID）
+*.gsheet
+# clasp 本機憑證（內含真實 scriptId / token）
+.clasp.json
+.clasprc.json
+
+# --- 主檔（含員工個資）---
+# 真實人事主檔不入版控；空白結構範本 HR主檔_結構版.xlsx 才可入庫
+HR主檔.xlsx
+
+# --- 備份 / 壓縮檔 ---
+*.bak
+*.bak.*
+*.zip
+
+# --- 內部開發目錄（含歷史對話、截圖、暫存）---
+archive/
+shots_*/
+tmp_*/
+.workbuddy/
+Projects/
+
+# --- 相依套件 ---
+node_modules/
+
+# --- 作業系統雜項 ---
+desktop.ini
+Thumbs.db
+.DS_Store

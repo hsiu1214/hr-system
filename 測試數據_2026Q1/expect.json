@@ -1,0 +1,453 @@
+{
+ "E001": {
+  "name": "王大明",
+  "type": "正職",
+  "identity": "勞工",
+  "month": {
+   "2026-01": {
+    "gross": 366844,
+    "net": 363971,
+    "hours": 178,
+    "otH": 2,
+    "ot": 711,
+    "hol": 2133,
+    "supp": 692,
+    "suppBasis": "逾當月投保金額 4 倍（267,200）之 32,800 部分",
+    "insAmount": 64000,
+    "gL": 45800,
+    "gH": 66800,
+    "laborWorker": 1145,
+    "healthSelf": 1036,
+    "pensionSelf": 0,
+    "wage": 64000,
+    "att": {
+     "reqDays": 22,
+     "workedDays": 22,
+     "absentDays": 0,
+     "lvNone": 0,
+     "lvHalf": 0,
+     "lvFull": 0,
+     "paidDays": 30,
+     "ratio": 1,
+     "deduct": {
+      "none": 0,
+      "half": 0,
+      "absent": 0
+     }
+    },
+    "note": "投保金額 64,000 逾勞保上限，勞保以 45,800 申報"
+   },
+   "2026-02": {
+    "gross": 66844,
+    "net": 64663,
+    "hours": 138,
+    "otH": 2,
+    "ot": 711,
+    "hol": 2133,
+    "supp": 0,
+    "suppBasis": "獎金 0 未逾投保金額 4 倍（267,200），免扣",
+    "insAmount": 64000,
+    "gL": 45800,
+    "gH": 66800,
+    "laborWorker": 1145,
+    "healthSelf": 1036,
+    "pensionSelf": 0,
+    "wage": 64000,
+    "att": {
+     "reqDays": 17,
+     "workedDays": 17,
+     "absentDays": 0,
+     "lvNone": 0,
+     "lvHalf": 0,
+     "lvFull": 0,
+     "paidDays": 30,
+     "ratio": 1,
+     "deduct": {
+      "none": 0,
+      "half": 0,
+      "absent": 0
+     }
+    },
+    "note": "投保金額 64,000 逾勞保上限，勞保以 45,800 申報"
+   },
+   "2026-03": {
+    "gross": 66211,
+    "net": 63983,
+    "hours": 178,
+    "otH": 2,
+    "ot": 711,
+    "hol": 0,
+    "supp": 0,
+    "suppBasis": "獎金 0 未逾投保金額 4 倍（279,200），免扣",
+    "insAmount": 67000,
+    "gL": 45800,
+    "gH": 69800,
+    "laborWorker": 1145,
+    "healthSelf": 1083,
+    "pensionSelf": 0,
+    "wage": 65500,
+    "att": {
+     "reqDays": 22,
+     "workedDays": 22,
+     "absentDays": 0,
+     "lvNone": 0,
+     "lvHalf": 0,
+     "lvFull": 0,
+     "paidDays": 30,
+     "ratio": 1,
+     "deduct": {
+      "none": 0,
+      "half": 0,
+      "absent": 0
+     }
+    },
+    "note": "本月含調薪（2023-03-01 → 2026-03-16），薪資依在職日比例拆分；投保金額 67,000 逾勞保上限，勞保以 45,800 申報"
+   }
+  },
+  "annualLeave2026": 14
+ },
+ "E002": {
+  "name": "陳美玲",
+  "type": "正職",
+  "identity": "勞工",
+  "month": {
+   "2026-01": {
+    "gross": 37000,
+    "net": 34307,
+    "hours": 160,
+    "otH": 0,
+    "ot": 0,
+    "hol": 0,
+    "supp": 0,
+    "suppBasis": "獎金 0 未逾投保金額 4 倍（152,800），免扣",
+    "insAmount": 37000,
+    "gL": 38200,
+    "gH": 38200,
+    "laborWorker": 955,
+    "healthSelf": 592,
+    "pensionSelf": 1146,
+    "wage": 37000,
+    "att": {
+     "reqDays": 20,
+     "workedDays": 20,
+     "absentDays": 0,
+     "lvNone": 0,
+     "lvHalf": 0,
+     "lvFull": 1,
+     "paidDays": 30,
+     "ratio": 1,
+     "deduct": {
+      "none": 0,
+      "half": 0,
+      "absent": 0
+     }
+    },
+    "note": ""
+   },
+   "2026-02": {
+    "gross": 56383,
+    "net": 53690,
+    "hours": 120,
+    "otH": 0,
+    "ot": 0,
+    "hol": 0,
+    "supp": 0,
+    "suppBasis": "獎金 20,000 未逾投保金額 4 倍（152,800），免扣",
+    "insAmount": 37000,
+    "gL": 38200,
+    "gH": 38200,
+    "laborWorker": 955,
+    "healthSelf": 592,
+    "pensionSelf": 1146,
+    "wage": 37000,
+    "att": {
+     "reqDays": 15,
+     "workedDays": 15,
+     "absentDays": 0,
+     "lvNone": 0,
+     "lvHalf": 1,
+     "lvFull": 0,
+     "paidDays": 29.5,
+     "ratio": 0.9833333333333333,
+     "deduct": {
+      "none": 0,
+      "half": 617,
+      "absent": 0
+     }
+    },
+    "note": ""
+   },
+   "2026-03": {
+    "gross": 35767,
+    "net": 33074,
+    "hours": 168,
+    "otH": 0,
+    "ot": 0,
+    "hol": 0,
+    "supp": 0,
+    "suppBasis": "獎金 0 未逾投保金額 4 倍（152,800），免扣",
+    "insAmount": 37000,
+    "gL": 38200,
+    "gH": 38200,
+    "laborWorker": 955,
+    "healthSelf": 592,
+    "pensionSelf": 1146,
+    "wage": 37000,
+    "att": {
+     "reqDays": 21,
+     "workedDays": 21,
+     "absentDays": 0,
+     "lvNone": 1,
+     "lvHalf": 0,
+     "lvFull": 0,
+     "paidDays": 29,
+     "ratio": 0.9666666666666667,
+     "deduct": {
+      "none": 1233,
+      "half": 0,
+      "absent": 0
+     }
+    },
+    "note": ""
+   }
+  },
+  "annualLeave2026": 10
+ },
+ "E003": {
+  "name": "林建宏",
+  "type": "正職",
+  "identity": "雇主(負責人)",
+  "month": {
+   "2026-01": {
+    "gross": 60000,
+    "net": 57912,
+    "hours": 168,
+    "otH": 0,
+    "ot": 0,
+    "hol": 0,
+    "supp": 0,
+    "suppBasis": "獎金 0 未逾投保金額 4 倍（243,200），免扣",
+    "insAmount": 60000,
+    "gL": 45800,
+    "gH": 60800,
+    "laborWorker": 1145,
+    "healthSelf": 943,
+    "pensionSelf": 0,
+    "wage": 60000,
+    "att": {
+     "reqDays": 21,
+     "workedDays": 21,
+     "absentDays": 0,
+     "lvNone": 0,
+     "lvHalf": 0,
+     "lvFull": 0,
+     "paidDays": 30,
+     "ratio": 1,
+     "deduct": {
+      "none": 0,
+      "half": 0,
+      "absent": 0
+     }
+    },
+    "note": "投保金額 60,000 逾勞保上限，勞保以 45,800 申報"
+   },
+   "2026-02": {
+    "gross": 60000,
+    "net": 57912,
+    "hours": 128,
+    "otH": 0,
+    "ot": 0,
+    "hol": 0,
+    "supp": 0,
+    "suppBasis": "獎金 0 未逾投保金額 4 倍（243,200），免扣",
+    "insAmount": 60000,
+    "gL": 45800,
+    "gH": 60800,
+    "laborWorker": 1145,
+    "healthSelf": 943,
+    "pensionSelf": 0,
+    "wage": 60000,
+    "att": {
+     "reqDays": 16,
+     "workedDays": 16,
+     "absentDays": 0,
+     "lvNone": 0,
+     "lvHalf": 0,
+     "lvFull": 0,
+     "paidDays": 30,
+     "ratio": 1,
+     "deduct": {
+      "none": 0,
+      "half": 0,
+      "absent": 0
+     }
+    },
+    "note": "投保金額 60,000 逾勞保上限，勞保以 45,800 申報"
+   },
+   "2026-03": {
+    "gross": 160000,
+    "net": 157912,
+    "hours": 176,
+    "otH": 0,
+    "ot": 0,
+    "hol": 0,
+    "supp": 0,
+    "suppBasis": "獎金 100,000 未逾投保金額 4 倍（243,200），免扣",
+    "insAmount": 60000,
+    "gL": 45800,
+    "gH": 60800,
+    "laborWorker": 1145,
+    "healthSelf": 943,
+    "pensionSelf": 0,
+    "wage": 60000,
+    "att": {
+     "reqDays": 22,
+     "workedDays": 22,
+     "absentDays": 0,
+     "lvNone": 0,
+     "lvHalf": 0,
+     "lvFull": 0,
+     "paidDays": 30,
+     "ratio": 1,
+     "deduct": {
+      "none": 0,
+      "half": 0,
+      "absent": 0
+     }
+    },
+    "note": "投保金額 60,000 逾勞保上限，勞保以 45,800 申報"
+   }
+  },
+  "annualLeave2026": 15
+ },
+ "E004": {
+  "name": "張雅婷",
+  "type": "計時",
+  "identity": "勞工",
+  "month": {
+   "2026-01": {
+    "gross": 31533,
+    "net": 30245,
+    "hours": 150,
+    "otH": 2,
+    "ot": 133,
+    "hol": 1400,
+    "supp": 0,
+    "suppBasis": "獎金 0 未逾投保金額 4 倍（127,200），免扣",
+    "insAmount": 31533,
+    "gL": 31800,
+    "gH": 31800,
+    "laborWorker": 795,
+    "healthSelf": 493,
+    "pensionSelf": 0,
+    "wage": 31533,
+    "att": null,
+    "note": ""
+   },
+   "2026-02": {
+    "gross": 34200,
+    "net": 32790,
+    "hours": 136,
+    "otH": 0,
+    "ot": 0,
+    "hol": 7000,
+    "supp": 0,
+    "suppBasis": "獎金 0 未逾投保金額 4 倍（139,200），免扣",
+    "insAmount": 34200,
+    "gL": 34800,
+    "gH": 34800,
+    "laborWorker": 870,
+    "healthSelf": 540,
+    "pensionSelf": 0,
+    "wage": 34200,
+    "att": null,
+    "note": ""
+   },
+   "2026-03": {
+    "gross": 28333,
+    "net": 27160,
+    "hours": 141,
+    "otH": 2,
+    "ot": 133,
+    "hol": 0,
+    "supp": 0,
+    "suppBasis": "獎金 0 未逾投保金額 4 倍（118,000），免扣",
+    "insAmount": 28333,
+    "gL": 28590,
+    "gH": 29500,
+    "laborWorker": 715,
+    "healthSelf": 458,
+    "pensionSelf": 0,
+    "wage": 28333,
+    "att": null,
+    "note": ""
+   }
+  },
+  "annualLeave2026": 5.5
+ },
+ "E005": {
+  "name": "李俊傑",
+  "type": "計時",
+  "identity": "勞工",
+  "month": {
+   "2026-01": {
+    "gross": 32340,
+    "net": 30825,
+    "hours": 147,
+    "otH": 0,
+    "ot": 0,
+    "hol": 1470,
+    "supp": 682,
+    "suppBasis": "未投保健保（非所屬投保單位・兼職所得）：當月給付 32,340 達基本工資 29,500，全額計收",
+    "insAmount": 32340,
+    "gL": 33300,
+    "gH": 33300,
+    "laborWorker": 833,
+    "healthSelf": 0,
+    "pensionSelf": 0,
+    "wage": 32340,
+    "att": null,
+    "note": ""
+   },
+   "2026-02": {
+    "gross": 36680,
+    "net": 34951,
+    "hours": 139,
+    "otH": 2,
+    "ot": 140,
+    "hol": 7350,
+    "supp": 774,
+    "suppBasis": "未投保健保（非所屬投保單位・兼職所得）：當月給付 36,680 達基本工資 29,500，全額計收",
+    "insAmount": 36680,
+    "gL": 38200,
+    "gH": 38200,
+    "laborWorker": 955,
+    "healthSelf": 0,
+    "pensionSelf": 0,
+    "wage": 36680,
+    "att": null,
+    "note": ""
+   },
+   "2026-03": {
+    "gross": 28980,
+    "net": 28242,
+    "hours": 138,
+    "otH": 0,
+    "ot": 0,
+    "hol": 0,
+    "supp": 0,
+    "suppBasis": "未投保健保（兼職所得）：當月給付 28,980 未達基本工資 29,500，免扣",
+    "insAmount": 28980,
+    "gL": 29500,
+    "gH": 29500,
+    "laborWorker": 738,
+    "healthSelf": 0,
+    "pensionSelf": 0,
+    "wage": 28980,
+    "att": null,
+    "note": ""
+   }
+  },
+  "annualLeave2026": 5.5
+ }
+}

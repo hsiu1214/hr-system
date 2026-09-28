@@ -1,0 +1,6 @@
+# 白名單：只推 GAS 專案真正需要的 3 個檔
+# （dev_dump.gs 為本機開發用 dump 工具，不上雲端）
+**/**
+!appsscript.json
+!punch_appscript.gs
+!PunchPage.html

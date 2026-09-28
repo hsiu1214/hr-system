@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#2563eb">
+<title>員工打卡</title>
+<style>
+  /* 尺寸系統：--u 是「基準字級」，隨螢幕寬度自動放大（clamp），再乘上使用者自選的 --zk。
+     所有尺寸都用 calc(var(--u)*倍率) 推導 → 改一個數字全站等比縮放，不用逐項改。
+     版面配比原則：按鈕以上的固定內容壓到最低，剩下的高度全部讓四顆打卡鈕撐滿。 */
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+  :root{--zk:1;--u:calc(clamp(20px,6vw,30px)*var(--zk))}
+  html,body{margin:0;padding:0;font-family:-apple-system,"Microsoft JhengHei","PingFang TC",sans-serif;background:#f8fafc;color:#1f2933}
+  body{font-size:var(--u);min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
+  /* 左右留白刻意壓小（原本 .wrap .8u + .card .9u 兩層相加，手機上左右各吃掉約 40px）：
+     改用 px 級的小值，把寬度讓給表格與按鈕，7 欄班表才有空間。 */
+  /* 滿屏：移除 max-width 上限與 auto 置中（寬螢幕不再留大白邊）；
+     左右內距壓到最小、並用 safe-area-inset 避開瀏海（landscape 才會有值），讓介面撐滿手機寬度 */
+  .wrap{flex:1 1 auto;width:100%;display:flex;flex-direction:column;
+        padding:calc(var(--u)*.55) max(env(safe-area-inset-left),clamp(4px,1.4vw,10px)) calc(var(--u)*1.1 + env(safe-area-inset-bottom)) max(env(safe-area-inset-right),clamp(4px,1.4vw,10px))}
+  /* 標題列：左右各一顆字體調整鈕（一開頁就看得到，不用往下滑找）。
+     這兩顆用固定尺寸（不吃 --u），避免放大後把標題擠到折行。 */
+  .hd{display:flex;align-items:center;justify-content:center;gap:calc(var(--u)*.3);
+      margin:calc(var(--u)*.1) 0 calc(var(--u)*.6)}
+  .hdmid{flex:0 1 auto;min-width:0;text-align:center}
+  .hd h1{font-size:calc(var(--u)*1.5);margin:0;color:#2563eb;letter-spacing:.5px}
+  .zkb{flex:0 0 auto;width:clamp(34px,calc(1.9*var(--u)),40px);height:clamp(32px,calc(1.7*var(--u)),38px);
+      font-size:clamp(15px,calc(0.8*var(--u)),18px);
+      font-weight:700;color:#2563eb;background:#fff;border:1.5px solid #cfd6dd;
+      border-radius:calc(var(--u)*.45);cursor:pointer;line-height:1;padding:0}
+  .zkb:active{transform:translateY(1px)}
+  .zkb[disabled]{opacity:.35}
+  .zkl{font-size:calc(var(--u)*.66);color:#8a96a3;line-height:1.4}
+
+  /* 卡片左右內距同步壓小（並避開 safe-area），讓編號/PIN/按鈕更貼邊、更撐滿寬度 */
+  .card{background:#fff;border:1px solid #e2e8f0;border-radius:calc(var(--u)*.85);padding:calc(var(--u)*.9) max(env(safe-area-inset-left),clamp(8px,1.2vw,12px)) calc(var(--u)*.9) max(env(safe-area-inset-right),clamp(8px,1.2vw,12px));
+        flex:1 1 auto;display:flex;flex-direction:column}
+  label{display:block;font-size:calc(var(--u)*.8);font-weight:600;color:#48545f;margin:0 0 calc(var(--u)*.3)}
+  select,input{width:100%;padding:calc(var(--u)*.6) calc(var(--u)*.7);font-size:calc(var(--u)*1.12);
+        line-height:1.3;border:1.5px solid #cfd6dd;border-radius:calc(var(--u)*.55);
+        margin-bottom:calc(var(--u)*.7);background:#fafbfc;color:#1f2933}
+  select{height:calc(var(--u)*3.1)}
+  input:focus,select:focus{outline:none;border-color:#2563eb;background:#fff}
+  .rowlab{display:flex;align-items:center;justify-content:space-between;gap:calc(var(--u)*.5);margin-bottom:calc(var(--u)*.3)}
+  .rowlab label{margin:0}
+  .refresh{flex:0 0 auto;padding:calc(var(--u)*.38) calc(var(--u)*.6);font-size:calc(var(--u)*.74);
+        font-weight:600;color:#2563eb;background:#e8effd;border:0;border-radius:calc(var(--u)*.45);cursor:pointer}
+  .refresh:active{transform:translateY(1px)}
+  .refresh[disabled]{opacity:.55}
+
+  /* 四顆打卡鈕：撐滿剩餘高度（螢幕越高＝鈕越大；上下限避免過小或變成巨大色塊） */
+  .grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:calc(var(--u)*.55);
+        margin-top:calc(var(--u)*.2);flex:1 1 auto;max-height:min(48vh,470px)}
+  .pk{display:flex;align-items:center;justify-content:center;flex-direction:column;height:100%;
+        min-height:clamp(160px,17vh,215px);border-radius:calc(var(--u)*.8);font-size:calc(var(--u)*1.25);
+        font-weight:700;color:#fff;border:0;cursor:pointer;letter-spacing:1px;padding:calc(var(--u)*.25)}
+  .pk:active{transform:translateY(2px)}
+  .pk small{font-size:calc(var(--u)*.68);font-weight:500;opacity:.92;margin-top:calc(var(--u)*.22);letter-spacing:0}
+  .b-on{background:#1f9d55}.b-off{background:#d9534f}.b-ron{background:#e08a00}.b-roff{background:#5b6b7b}
+
+  .msg{margin-top:calc(var(--u)*.7);font-size:calc(var(--u)*.86);line-height:1.6;
+        padding:calc(var(--u)*.55) calc(var(--u)*.65);border-radius:calc(var(--u)*.55);display:none}
+  .msg.ok{display:block;background:#e6f6ec;color:#1a7d44}
+  .msg.err{display:block;background:#fdecec;color:#c9302c}
+  .msg.info{display:block;background:#e8effd;color:#2563eb}
+  .recent{margin-top:auto;padding-top:calc(var(--u)*.7);font-size:calc(var(--u)*.86);color:#3a4750;line-height:1.7}
+  .recent .t{font-size:calc(var(--u)*.72);font-weight:600;color:#8a96a3;margin-bottom:calc(var(--u)*.2)}
+  .recent b{color:#2563eb}
+  .meta{font-size:calc(var(--u)*.68);color:#8a96a3;line-height:1.5;margin:calc(var(--u)*.5) 0 0;text-align:center}
+  .muted{color:#aab3bc}
+  /* 我的出勤：登入後展開的 5 個子標題，彼此用細線分隔 */
+  .sub{border-top:1px solid #eef1f5;padding-top:calc(var(--u)*.6)}
+
+  /* 班表：全店可見、免密碼，純顯示不與打卡比對。
+     只顯示「所選那一週」7 天；姓名用窄欄、7 天吃滿剩餘寬；
+     字級固定（不隨 --u / A＋ 放大）避免 7 欄被撐爆而重疊。
+     左右負邊距把卡片內距「吃回來」，讓表格盡量貼齊卡片邊緣＝有效寬度最大。 */
+  .sch{margin:calc(var(--u)*.9) calc(var(--u)*-.35) 0;padding:calc(var(--u)*.8) 2px 0;
+       border-top:1px solid #e3e8ee;font-size:12px;color:#3a4750}
+  .schhead{display:flex;flex-wrap:wrap;align-items:center;gap:calc(var(--u)*.35);margin-bottom:calc(var(--u)*.45)}
+  .schhead .t{font-size:calc(var(--u)*.8);font-weight:700;color:#2563eb;margin-right:auto}
+  /* 三段式挑選：年 ＋ 月 ＋ 該月週別（年、月各自獨立選，不綁成單一清單）。選了週別才會連雲端。 */
+  .schpick{display:flex;gap:calc(var(--u)*.3);margin-bottom:calc(var(--u)*.5)}
+  .schpick select{margin:0;width:auto;height:auto;padding:calc(var(--u)*.3) calc(var(--u)*.4);
+       font-size:calc(var(--u)*.72);border-radius:calc(var(--u)*.4);min-width:0}
+  .schpick #schYear{flex:0 0 auto}
+  .schpick #schMonth{flex:0 0 auto}
+  .schpick #schWeek{flex:1 1 auto}
+  .schwrap{width:100%}
+  .schlist{width:100%}
+  .schrow{display:flex;align-items:stretch;border-bottom:1px solid #eef1f5;padding:calc(var(--u)*.22) 0}
+  .schrow:last-child{border-bottom:0}
+  .schrow .nm{flex:0 0 4.8em;min-width:0;overflow:visible;white-space:normal;word-break:break-word;
+       text-align:left;padding-right:calc(var(--u)*.4);border-right:1px solid #eef1f5;line-height:1.3}
+  .schrow .nm i{font-style:normal;color:#8a96a3;font-size:10px}
+  .schrow .nm i.rsg{color:#d6453d}   /* 2026-09-21(6)：離職標記（最後排班日＝離職日） */
+  .schrow .dy{flex:1 1 0;min-width:0;text-align:center;color:#c3cad2;line-height:1.25;overflow:hidden}
+  .schrow .dy .dw{display:block;font-size:10px;font-weight:400;color:#98a2ad}
+  .schrow.hd{border-bottom:1.5px solid #cfd6dd;font-weight:700;color:#48545f;padding-bottom:calc(var(--u)*.3)}
+  .schrow.hd .nm{color:#48545f;font-size:12px}
+  .schrow.hd .dy{color:#48545f;font-size:12px}
+  .cd{display:inline-block;min-width:1.35em;padding:0 3px;border-radius:3px;
+      background:#e8effd;color:#2563eb;font-weight:700}
+  .cd.r{background:#f0f1f3;color:#8a96a3}
+  .cd.u{background:#fdecec;color:#c9302c}
+  .cd.t{background:#e6f6ec;color:#1a7d44;font-weight:600}   /* 上班時段：顯示 24H 時間（上下班兩行） */
+  .cd.v{background:#fbeaf0;color:#993556;font-weight:600}   /* 假別（年假…）：算上班時數 */
+  .cd .l1,.cd .l2{display:block;line-height:1.15;white-space:nowrap}
+  .cd .l2{font-weight:400}
+  /* 我的打卡：每個打卡點的小標籤（上班/下班/休息開始/休息結束） */
+  .pch{display:inline-block;padding:1px 7px;border-radius:4px;font-size:calc(var(--u)*.72);
+       font-weight:600;margin:2px 3px;line-height:1.5;white-space:nowrap}
+  .pch.on{background:#e6f6ec;color:#1a7d44}     /* 上班 */
+  .pch.off{background:#fdeee7;color:#48545f}    /* 下班 */
+  .pch.ron{background:#fdf1e0;color:#b9700c}    /* 休息開始 */
+  .pch.roff{background:#eef0f3;color:#5b6b7b}   /* 休息結束 */
+  .pch .jt{font-weight:400;opacity:.8;font-size:calc(var(--u)*.62);margin-left:2px}
+  .schlg{margin-top:calc(var(--u)*.4);font-size:11px;color:#8a96a3;line-height:1.7}
+  .schlg .sw{display:inline-block;margin-right:calc(var(--u)*.4)}
+  .schlg .sw b{display:inline-block;min-width:1.35em;padding:0 3px;border-radius:3px;
+      background:#e8effd;color:#2563eb;margin-right:2px}
+
+  /* 極窄機（<=360px）稍微收斂，避免破版 */
+  @media (max-width:360px){
+    :root{--u:calc(clamp(19px,5.6vw,30px)*var(--zk))}
+  }
+
+  /* 日期／時間自訂輸入（2026-09-26 需求方）：年/月/日 三格、時:分 兩格；輸入滿自動跳下一格、時間一律 24 小時制
+     （覆蓋上方 select,input{width:100%} 的滿寬；flex:0 0 auto 避免被壓縮） */
+  .dtgrp,.tmgrp{display:inline-flex;align-items:center;gap:calc(var(--u)*.15);white-space:nowrap;
+      font-size:calc(var(--u)*.95);color:#5b6874}
+  .dtgrp input,.tmgrp input{flex:0 0 auto;width:auto;padding:calc(var(--u)*.5) calc(var(--u)*.2);
+      font-size:calc(var(--u)*1.08);text-align:center;border-radius:6px;font-variant-numeric:tabular-nums}
+  .dtgrp input.dty{width:calc(var(--u)*3.4)}
+  .dtgrp input.dtm,.dtgrp input.dtd,.tmgrp input{width:calc(var(--u)*2.3)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hd">
+    <button class="zkb" type="button" id="zkMinus" onclick="zoomStep(-1)" aria-label="字體縮小">A－</button>
+    <div class="hdmid">
+      <h1>員工打卡</h1>
+      <div class="zkl" id="zkLabel"></div>
+    </div>
+    <button class="zkb" type="button" id="zkPlus" onclick="zoomStep(1)" aria-label="字體放大">A＋</button>
+  </div>
+
+  <!-- 單一畫面：編號＋PIN＋四顆打卡鈕同屏，免先登入 -->
+  <div class="card" id="padPanel">
+    <div class="rowlab">
+      <label for="pkId">員工編號</label>
+      <button class="refresh" id="btnRefreshEmp" type="button" onclick="refreshEmpOptions()">↻ 更新名單</button>
+    </div>
+    <select id="pkId" onchange="onPickEmp()"><option value="">載入中…</option></select>
+    <label for="pkPin">PIN 密碼</label>
+    <input id="pkPin" type="password" inputmode="numeric" placeholder="4 位數 PIN">
+    <div class="grid">
+      <button class="pk b-on"  type="button" onclick="tryPunch('上班')">上班<small>開始工作</small></button>
+      <button class="pk b-off" type="button" onclick="tryPunch('下班')">下班<small>結束工作</small></button>
+      <button class="pk b-ron" type="button" onclick="tryPunch('休息開始')">休息開始<small>離開工位</small></button>
+      <button class="pk b-roff" type="button" onclick="tryPunch('休息結束')">休息結束<small>回到工位</small></button>
+    </div>
+    <div class="msg" id="punchNote"></div>
+    <!-- 班表（全店可見、免密碼；純顯示，不與打卡比對；開頁不抓，選週才載入） -->
+    <div class="sch" id="schBox">
+      <div class="schhead">
+        <span class="t">排班表</span>
+        <button class="refresh" type="button" id="schReload">↻ 重新整理</button>
+      </div>
+      <div class="schpick">
+        <select id="schYear" aria-label="選擇年份"></select>
+        <select id="schMonth" aria-label="選擇月份"></select>
+        <select id="schWeek" aria-label="選擇週別"></select>
+      </div>
+      <div class="schwrap" id="schCal"><span class="muted">請選擇上方的週別以載入排班</span></div>
+      <div class="schlg" id="schLegend"></div>
+    </div>
+    <div class="recent">
+      <div class="t">最近打卡</div>
+      <div id="recentList"><span class="muted">尚無</span></div>
+    </div>
+    <div class="meta" id="empMeta">讀取員工名單中…</div>
+  </div>
+
+  <!-- 我的出勤：2026-09-27 需求重構——統一登入一次（編號＋PIN），內含 5 個申請/查詢標題 -->
+  <div class="card" id="attPanel" style="margin-top:calc(var(--u)*.8)">
+    <div class="schhead">
+      <span class="t">我的出勤</span>
+      <button class="refresh" type="button" id="btnAttRefresh">↻ 更新名單</button>
+    </div>
+    <label for="attId">員工編號</label>
+    <select id="attId"><option value="">— 選擇員工編號 —</option></select>
+    <label for="attPin">PIN 密碼</label>
+    <input id="attPin" type="password" inputmode="numeric" placeholder="4 位數 PIN">
+    <button class="pk b-on" type="button" id="btnAttLogin"
+            style="height:auto;min-height:calc(var(--u)*2.4);font-size:calc(var(--u)*1.1);margin-top:calc(var(--u)*.3)">登入我的出勤</button>
+    <div class="msg" id="attLoginMsg"></div>
+
+    <!-- 登入後才顯示 5 個標題 -->
+    <div id="attBody" style="display:none">
+
+      <!-- ① 請假申請 -->
+      <div class="sub" id="attApplyLeave" style="margin-top:calc(var(--u)*.9)">
+        <div class="schhead">
+          <span class="t" id="attApplyLeaveToggle" style="cursor:pointer;user-select:none">請假申請 <span id="attApplyLeaveCaret">▸</span></span>
+        </div>
+        <div id="attApplyLeaveBody" style="display:none">
+          <label for="lvType">請假假別</label>
+          <select id="lvType"></select>
+          <label for="lvStart">請假日期（起）</label>
+          <input id="lvStart" type="date">
+          <label for="lvEnd">請假日期（迄，單日可留空）</label>
+          <input id="lvEnd" type="date">
+          <label for="lvHours">請假時數</label>
+          <input id="lvHours" type="number" min="0" step="0.5" placeholder="如 8">
+          <div class="meta" style="font-size:11px;color:#8a96a3;line-height:1.4">小字提醒：工作時數不含休息時間（如排班 09:00–17:00 含休息 1h，請填 7）</div>
+          <div class="meta" id="lvHoursPreview" style="font-size:11px;color:#8a96a3"></div>
+          <button class="pk b-on" type="button" id="btnLeaveSubmit"
+                  style="height:auto;min-height:calc(var(--u)*2.4);font-size:calc(var(--u)*1.1);margin-top:calc(var(--u)*.3)">送出請假申請</button>
+          <div class="msg" id="leaveNote"></div>
+        </div>
+      </div>
+
+      <!-- ② 請假查詢 -->
+      <div class="sub" id="attQueryLeave" style="margin-top:calc(var(--u)*.9)">
+        <div class="schhead">
+          <span class="t" id="attQueryLeaveToggle" style="cursor:pointer;user-select:none">請假查詢 <span id="attQueryLeaveCaret">▸</span></span>
+        </div>
+        <div id="attQueryLeaveBody" style="display:none">
+          <div class="rowlab">
+            <label for="lvMyYear">查詢年</label>
+            <label for="lvMyMonth">查詢月</label>
+          </div>
+          <div style="display:flex;gap:calc(var(--u)*.5)">
+            <select id="lvMyYear"><option value="">全部年份</option></select>
+            <select id="lvMyMonth"><option value="">全部月份</option></select>
+          </div>
+          <button class="refresh" type="button" id="btnLeaveMy">查詢我的請假</button>
+          <div class="meta" id="leaveMyList"><span class="muted">登入後點此標題自動查詢</span></div>
+        </div>
+      </div>
+
+      <!-- ③ 加班申請 -->
+      <div class="sub" id="attApplyOt" style="margin-top:calc(var(--u)*.9)">
+        <div class="schhead">
+          <span class="t" id="attApplyOtToggle" style="cursor:pointer;user-select:none">加班申請 <span id="attApplyOtCaret">▸</span></span>
+        </div>
+        <div id="attApplyOtBody" style="display:none">
+          <label for="otDate">加班日期</label>
+          <input id="otDate" type="date">
+          <label for="otStart">開始時間</label>
+          <input id="otStart" type="time">
+          <label for="otEnd">結束時間</label>
+          <input id="otEnd" type="time">
+          <label for="otRest">休息時數（小時，選填）</label>
+          <input id="otRest" type="number" min="0" step="0.5" inputmode="decimal" placeholder="如 1；全程無休息請留空">
+          <label for="otPay">補償方式</label>
+          <select id="otPay"><option>加班費</option><option>加班補休</option></select>
+          <label for="otMemo">事由（選填）</label>
+          <input id="otMemo" type="text" placeholder="如：晚尖峰人潮">
+          <div class="meta" id="otHoursPreview" style="font-size:11px;color:#8a96a3"></div>
+          <div class="meta" style="font-size:11px;color:#8a96a3;line-height:1.4">
+            規則：只須申請「排班時段以外」的加班（排班內不用申請）；<b>沒排班的日子（含國定假日）跑來上班，整天都要申請</b>；
+            中間若有休息，請填「<b>休息時數</b>」，會從加班時數中扣除；
+            目前測試期間<b>不限申請期限</b>；送出後不可自行撤回，要改請聯絡雇主。選「加班補休」者，須於<b>加班日起 6 個月</b>內使用完畢，逾期折發工資。
+          </div>
+          <button class="pk b-on" type="button" id="btnOtSubmit"
+                  style="height:auto;min-height:calc(var(--u)*2.4);font-size:calc(var(--u)*1.1);margin-top:calc(var(--u)*.3)">送出加班申請</button>
+          <div class="msg" id="otNote"></div>
+        </div>
+      </div>
+
+      <!-- ④ 加班查詢 -->
+      <div class="sub" id="attQueryOt" style="margin-top:calc(var(--u)*.9)">
+        <div class="schhead">
+          <span class="t" id="attQueryOtToggle" style="cursor:pointer;user-select:none">加班查詢 <span id="attQueryOtCaret">▸</span></span>
+        </div>
+        <div id="attQueryOtBody" style="display:none">
+          <div class="rowlab">
+            <label for="otMyYear">查詢年</label>
+            <label for="otMyMonth">查詢月</label>
+          </div>
+          <div style="display:flex;gap:calc(var(--u)*.5)">
+            <select id="otMyYear"><option value="">全部年份</option></select>
+            <select id="otMyMonth"><option value="">全部月份</option></select>
+          </div>
+          <button class="refresh" type="button" id="btnOtMy">查詢我的加班</button>
+          <div class="meta" id="otMyList"><span class="muted">登入後點此標題自動查詢</span></div>
+        </div>
+      </div>
+
+      <!-- ⑤ 打卡查詢 -->
+      <div class="sub" id="attQueryPunch" style="margin-top:calc(var(--u)*.9)">
+        <div class="schhead">
+          <span class="t" id="attQueryPunchToggle" style="cursor:pointer;user-select:none">打卡查詢 <span id="attQueryPunchCaret">▸</span></span>
+        </div>
+        <div id="attQueryPunchBody" style="display:none">
+          <div class="rowlab">
+            <label for="pkMyYear">查詢年</label>
+            <label for="pkMyMonth">查詢月</label>
+          </div>
+          <div style="display:flex;gap:calc(var(--u)*.5)">
+            <select id="pkMyYear"></select>
+            <select id="pkMyMonth"></select>
+          </div>
+          <button class="refresh" type="button" id="btnPunchMy">查詢我的打卡</button>
+          <div class="meta" id="punchMyList"><span class="muted">登入後點此標題自動查詢</span></div>
+        </div>
+      </div>
+
+    </div><!-- /attBody -->
+  </div><!-- /attPanel -->
+</div>
+
+<script>
+// 註：店家座標與電子圍籬設定已移往「主系統 → 出勤統計 → 雲端中繼設定」，
+//     由主檔依打卡 GPS 計算距離（本頁僅負責記錄緯度/經度）。
+
+var State = { emp:null, recent:[], lastLoadAt:0, loading:false, empStatus:{}, empLeave:{}, myLeaves:[], myPunches:[], myOts:[] };
+
+function $(id){ return document.getElementById(id); }
+function getVal(id){ var e=$(id); return e?e.value:""; }
+function setVal(id,v){ var e=$(id); if(e) e.value=v; }
+function setText(id,t){ var e=$(id); if(e) e.textContent=t; }
+function showMsg(id,t,cls){ var e=$(id); if(!e) return; e.innerHTML=t; e.className="msg"+(cls?" "+cls:""); }
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];}); }
+function hhmm(d){ var p=function(n){return (n<10?"0":"")+n;}; return p(d.getHours())+":"+p(d.getMinutes()); }
+
+// ===== 字體大小（A－／A＋，記在手機 localStorage，下次沿用）=====
+var ZK=[1,1.15,1.3,1.45,1.6], zkIdx=0;
+function applyZoom(){
+  document.documentElement.style.setProperty("--zk", String(ZK[zkIdx]));
+  setText("zkLabel", zkIdx>0 ? ("放大 "+Math.round(ZK[zkIdx]*100)+"%") : "");
+  var mn=$("zkMinus"), pl=$("zkPlus");
+  if(mn) mn.disabled = (zkIdx<=0);
+  if(pl) pl.disabled = (zkIdx>=ZK.length-1);
+  try{ localStorage.setItem("pkZoomV1", String(zkIdx)); }catch(e){}
+}
+function zoomStep(d){
+  zkIdx = Math.max(0, Math.min(ZK.length-1, zkIdx+d));
+  applyZoom();
+}
+(function initZoom(){
+  try{
+    var v=parseInt(localStorage.getItem("pkZoomV1"),10);
+    if(!isNaN(v) && v>=0 && v<ZK.length) zkIdx=v;
+  }catch(e){}
+  applyZoom();
+})();
+
+function stamp14(){
+  var d=new Date(), p=function(n){return (n<10?"0":"")+n;};
+  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes())+":"+p(d.getSeconds());
+}
+// 選了人 → 先取消舊的驗證狀態並提示（避免換人卻沿用上一個人的身分）
+function onPickEmp(){
+  State.emp=null;
+  var sel=$("pkId"); if(!sel) return;
+  var id=String(sel.value||"").trim();
+  if(!id) return;
+  var o=sel.options[sel.selectedIndex], nm=o?(o.getAttribute("data-nm")||""):"";
+  showMsg("punchNote","已選員工："+esc(nm)+"（"+esc(id)+"）· 輸入 PIN 後直接點下方按鈕打卡。","info");
+}
+
+// 打卡：點鈕時先驗證編號＋PIN（免先登入），通過後取 GPS → 電子圍籬 → 寫雲端
+function tryPunch(type){
+  var id=getVal("pkId").trim().toUpperCase(), pin=getVal("pkPin");
+  if(!id||!pin) return showMsg("punchNote","請先選擇員工並輸入 PIN 再打卡。","err");
+  // 同一人連續打卡：已驗證且編號/PIN 未變，直接打
+  if(State.emp && State.emp.編號===id && State.emp._pin===pin) return doPunch(type);
+  showMsg("punchNote","驗證中…","info");
+  // 驗證改由雲端伺服器比對（verifyEmpPin），前端不再取得 PIN 清單
+  verifyEmp(id, pin, function(emp, err){
+    if(err) return showMsg("punchNote", err, "err");
+    State.emp={ 編號:emp["員工編號"], 姓名:emp["姓名"], _pin:pin };
+    doPunch(type);
+  });
+}
+
+// 打卡：取 GPS → 產生紀錄 → google.script.run 寫入雲端（不判距離/狀態，交由主檔計算）
+function doPunch(type){
+  if(!State.emp) return showMsg("punchNote","請先輸入編號與 PIN。","err");
+  var rec={ "紀錄編號":"L"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+            "時間戳":stamp14(), "員工編號":State.emp.編號, "姓名":State.emp.姓名,
+            "類型":type, "緯度":"", "經度":"", "距離":"", "判定":"正常",
+            "來源":"自打", "補登人":"", "補登時間":"", "補登原因":"", "修正對象":"" };
+  var done=function(){
+    State.recent.unshift(rec); State.recent=State.recent.slice(0,10);
+    renderRecent();
+    var info=esc(rec["姓名"])+"　"+esc(type)+"　"+esc(rec["時間戳"]);
+    showMsg("punchNote","✅ 已打卡："+info,"ok");
+    google.script.run.withFailureHandler(function(e){
+      showMsg("punchNote","⚠️ 本機已記錄，但上傳雲端失敗："+esc(e&&e.message||e),"err");
+    }).addPunch(rec);
+  };
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(function(pos){
+      // 只記錄 GPS 定位；距離與判定一律由主檔依店家座標計算（本頁不判距離/狀態）
+      rec["緯度"]=pos.coords.latitude; rec["經度"]=pos.coords.longitude;
+      rec["判定"]="正常";
+      done();
+    }, function(){ rec["判定"]="無定位"; done(); }, {enableHighAccuracy:true, timeout:8000, maximumAge:0});
+  } else { rec["判定"]="無定位"; done(); }
+}
+function renderRecent(){
+  var box=$("recentList"); if(!box) return;
+  box.innerHTML = State.recent.length ? State.recent.map(function(r){
+    return esc(r["時間戳"])+"　<b>"+esc(r["類型"])+"</b>　"+esc(r["判定"]);
+  }).join("<br>") : '<span class="muted">尚無</span>';
+}
+
+// ===== 員工名單（下拉）：開頁載入，並提供手動／自動更新 =====
+// 每次載入都重抓雲端最新名單（主系統按「上傳員工名單到雲端」後即會反映），
+// 並保留使用者已選的編號，不會因更新而被清掉。
+function loadEmpOptions(silent){
+  var sel=$("pkId"); if(!sel || State.loading) return;
+  State.loading=true;
+  var btn=$("btnRefreshEmp"); if(btn) btn.disabled=true;
+  var keep=sel.value;
+  if(!silent) setText("empMeta","讀取員工名單中…");
+  google.script.run.withSuccessHandler(function(dir){
+    State.loading=false; if(btn) btn.disabled=false;
+    var all=(dir||[]);
+    // 記下「全部員工」的狀態與離職日（含離職）→ 排班表用來隱藏離職員工的空白列、
+    // 並讓「最後排班日＝離職日」（離職日之後的欄位留白）。2026-09-21
+    var st={}, lv={};
+    all.forEach(function(e){
+      var i=String(e["員工編號"]||"").trim();
+      if(!i) return;
+      st[i]=String(e["狀態"]||"在職");
+      lv[i]=normDateStr(e["離職日"]);
+    });
+    State.empStatus=st; State.empLeave=lv;
+    // 2026-09-21(7)：可打卡名單＝**在職期間內**（在職者 ∪ 離職日還沒到者）。
+    //   原本一律排除「狀態＝離職」→ 離職日還沒到、人還在上班，卻連自己都選不到、無法打卡。
+    var list=all.filter(function(e){ return String(e["員工編號"]||"").trim() && empInService(e); });
+    list.sort(function(a,b){
+      return String(a["員工編號"]).localeCompare(String(b["員工編號"]),undefined,{numeric:true});
+    });
+    if(!list.length){
+      sel.innerHTML='<option value="">— 名單為空 —</option>';
+      setText("empMeta","雲端尚無員工名單（共 0 位）");
+      return showMsg("punchNote","雲端員工名單是空的，請管理員先在主系統按「上傳員工名單到雲端」。","err");
+    }
+    var opts='<option value="">— 選擇員工編號 —</option>'+list.map(function(e){
+      var id=String(e["員工編號"]||"").trim(), nm=String(e["姓名"]||"").trim();
+      // 雲端不再回傳 PIN（安全），只回 hasPin 布林
+      var hasPin=!!e["hasPin"];
+      return '<option value="'+esc(id)+'" data-nm="'+esc(nm)+'">'+esc(id)+'　'+esc(nm)+(hasPin?"":"（未設 PIN）")+'</option>';
+    }).join("");
+    sel.innerHTML=opts;
+    // 我的出勤：統一下拉（登入後的 5 個標題共用同一份雲端名單）
+    var lvSels=document.querySelectorAll("#attId");
+    for(var k=0;k<lvSels.length;k++){ if(lvSels[k]) lvSels[k].innerHTML=opts; }
+    // 還原先前選擇（若該員工仍在名單中）
+    if(keep && list.some(function(e){ return String(e["員工編號"]).trim()===keep; })) sel.value=keep;
+    State.lastLoadAt=Date.now();
+    var noPin=list.filter(function(e){ return !e["hasPin"]; }).length;
+    setText("empMeta","共 "+list.length+" 位員工"+(noPin?("（"+noPin+" 位未設 PIN，無法打卡）"):"")+" · 更新於 "+hhmm(new Date()));
+    rerenderSchedIfLoaded();     // 名單（狀態）剛更新 → 重新套用排班篩選
+  }).withFailureHandler(function(e){
+    State.loading=false; if(btn) btn.disabled=false;
+    if(!silent || !sel.options.length || sel.options[0].value===""){
+      sel.innerHTML='<option value="">— 載入失敗 —</option>';
+    }
+    setText("empMeta","名單載入失敗，請按「↻ 更新名單」重試");
+    showMsg("punchNote","無法載入員工清單："+esc(e&&e.message||e),"err");
+  }).getEmps();
+}
+function refreshEmpOptions(){ loadEmpOptions(false); }
+
+// ===== 排班表（全店可見、免密碼、不比對打卡）=====
+// 資料＝主檔按「☁ 上傳排班到雲端」後存進雲端試算表該月分頁（排班-YYYY-MM）。
+// 只讀不寫；與打卡完全無關（打卡不需要看排班）。
+// 載入策略：開頁不連雲端；使用者選了週別（或按「重新整理」）才向雲端要一次該月資料，之後切週用快取。
+// 2026-09-21：格子直接存「時間字串」，手機端不再需要班別對照表。
+// 舊雲端資料若還是代碼（A/B/F/R），在此展開成時間顯示（下次主檔上傳排班後即為時間）。
+// 2026-09-21(2)：新增「年／月」下拉（可回看歷史月、先看下個月）。
+// 2026-09-21(3)：年與月**分開選**（各自獨立下拉），不再綁成單一 25 個月的月份清單。
+// 2026-09-21(5)：**離職員工的空白班表不顯示**（整月都空的列＝雜訊）。狀態來自 getEmps 的「狀態」欄。
+// 2026-09-21(6)：**最後排班日＝離職日**——離職日之後的欄位一律留白，並在姓名下標示離職日。
+//                  離職日來自 getEmps 的「離職日」欄（舊 GAS 沒這欄 → 全部視為在職，行為與 (5) 相同）。
+// 2026-09-21(7)：**可打卡名單改為「在職期間內」**＝在職者 ∪ 離職日還沒到者（含當天，見 empInService）。
+//                  原本一律排除「狀態＝離職」，導致離職日還沒到、人還在上班卻選不到自己、無法打卡。
+var LEGACY_CODE = { "A":"09:00-17:00", "B":"17:00-22:00", "C":"11:00-15:00",
+                    "F":"09:00-21:00", "S":"11:00-14:00;17:00-21:00", "R":"休" };
+
+function ymNowStr(){
+  var d=new Date(), p=function(n){return (n<10?"0":"")+n;};
+  return d.getFullYear()+"-"+p(d.getMonth()+1);
+}
+// 年份下拉：本年 ±SCHED_YEARS（共 3 年）。不連雲端，純本機清單。
+var SCHED_YEARS = 1;
+function populateYearOptions(keepY){
+  var sel=$("schYear"); if(!sel) return;
+  var now=Number(ymNowStr().slice(0,4)), opts=[];
+  for(var y=now-SCHED_YEARS; y<=now+SCHED_YEARS; y++)
+    opts.push('<option value="'+y+'">'+y+'年</option>');
+  sel.innerHTML=opts.join("");
+  var k=Number(keepY);
+  sel.value=(k>=now-SCHED_YEARS && k<=now+SCHED_YEARS) ? String(k) : String(now);
+}
+// 月份下拉：固定 1~12 月（與年份各自獨立選）。不連雲端，純本機清單。
+function populateMonthOptions(keepM){
+  var sel=$("schMonth"); if(!sel) return;
+  var opts=[];
+  for(var m=1; m<=12; m++)
+    opts.push('<option value="'+(m<10?"0":"")+m+'">'+m+'月</option>');
+  sel.innerHTML=opts.join("");
+  var k=Number(keepM);
+  sel.value=(k>=1 && k<=12) ? ((k<10?"0":"")+k) : ymNowStr().slice(5,7);
+}
+// 目前選定的年月（下拉失效時各自退回本月）
+function currentYm(){
+  var y=$("schYear"), m=$("schMonth");
+  var ys=(y && /^\d{4}$/.test(String(y.value||""))) ? String(y.value) : ymNowStr().slice(0,4);
+  var ms=(m && /^(0[1-9]|1[0-2])$/.test(String(m.value||""))) ? String(m.value) : ymNowStr().slice(5,7);
+  return ys+"-"+ms;
+}
+function daysInMonth(ym){
+  var p=String(ym).split("-");
+  return new Date(Number(p[0]), Number(p[1]), 0).getDate();
+}
+// 該月週別（週一為始）→ [{days:[1,2,..]}]：與主檔「週網格」同一套週定義
+function schedWeeksOf(ym){
+  var y=Number(ym.slice(0,4)), m=Number(ym.slice(5,7));
+  var last=daysInMonth(ym);
+  var out=[], cur=null;
+  for(var d=1; d<=last; d++){
+    var dow=(new Date(y, m-1, d).getDay()+6)%7;   // 0=週一
+    if(!cur || dow===0){ cur={days:[]}; out.push(cur); }
+    cur.days.push(d);
+  }
+  return out;
+}
+// 該週 7 欄（週一..週日）對應的日期；落在本月外為 null。與主檔 weekColDays 同一套對齊。
+function weekColDays(ym, wk){
+  var p=String(ym).split("-"), y=Number(p[0]), m=Number(p[1]);
+  var last=daysInMonth(ym);
+  var firstDow=(new Date(y, m-1, wk.days[0]).getDay()+6)%7;   // 0=週一
+  var origin=wk.days[0]-firstDow;
+  var out=[];
+  for(var i=0;i<7;i++){ var d=origin+i; out.push((d>=1 && d<=last)? d : null); }
+  return out;
+}
+// 週網格（方案 A：姓名窄欄在左、7 天吃滿剩餘寬）：只畫「選定那一週」的 7 天，格內顯示 24H 時間。
+// 週一為始：首週若 1 號不是週一，最前面留空白格；末週尾部同理留白。表頭顯示該欄「月/日＋星期」。
+// 該員工是否已離職（狀態來自手機載入的雲端員工名單；名單未載到→視為在職，避免誤藏）
+function isResigned(id){
+  return String((State.empStatus||{})[String(id==null?"":id).trim()]||"")==="離職";
+}
+// 日期正規化：GAS 可能回字串、也可能回 Date 物件 → 一律 YYYY-MM-DD（失敗回空字串）
+function normDateStr(v){
+  if(v instanceof Date){
+    var p=function(n){return (n<10?"0":"")+n;};
+    return v.getFullYear()+"-"+p(v.getMonth()+1)+"-"+p(v.getDate());
+  }
+  var s=String(v==null?"":v).trim();
+  // ISO 8601（2026-09-22T02:25:11.000Z）：試算表會把「日期字串」自動轉成日期值，
+  // 讀回經序列化就成了 UTC ISO；直接截前 10 字會在 16:00Z 之後**差一天**，
+  // 故帶時區者一律以台北固定 +8 還原牆鐘日期（台灣無日光節約）。
+  var iso=/^(\d{4})-(\d{2})-(\d{2})[T ]\d{2}:\d{2}/.exec(s);
+  if(iso){
+    if(!/(Z|[+-]\d{2}:?\d{2})$/.test(s)) return iso[1]+"-"+iso[2]+"-"+iso[3];
+    var ms=Date.parse(s);
+    if(!isNaN(ms)){
+      var d=new Date(ms+8*3600*1000), p2=function(n){return (n<10?"0":"")+n;};
+      return d.getUTCFullYear()+"-"+p2(d.getUTCMonth()+1)+"-"+p2(d.getUTCDate());
+    }
+  }
+  var m=/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/.exec(s);
+  if(!m) return "";
+  return m[1]+"-"+(m[2].length<2?"0":"")+m[2]+"-"+(m[3].length<2?"0":"")+m[3];
+}
+// 2026-09-21(7)：是否仍在僱傭期間＝在職者 ∪ 離職日還沒到者（含當天）。
+//   打卡名單用：離職日還沒到的人**還在上班**，當然要能打卡；離職日一過就不再出現。
+//   ⚠ 主檔 `inServiceToday()` 是同一條規則，兩邊必須一致（改一邊要改另一邊）。
+function empInService(e, today){
+  if(!e) return false;
+  if(String(e["狀態"]||"")!=="離職") return true;
+  var lv=normDateStr(e["離職日"]);
+  return !!lv && lv>=(today||normDateStr(new Date()));
+}
+// 2026-09-21(6)：該員工在指定月份的「最後可排班日」＝離職日
+//   回傳日（1~31）；0＝該月已離職（整月都不可排）；null＝不受限（未離職／沒填離職日／名單未載到）
+function leaveCutDay(id, ym){
+  var lv=String((State.empLeave||{})[String(id==null?"":id).trim()]||"");
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(lv)) return null;
+  var lm=lv.slice(0,7);
+  if(lm===ym) return Number(lv.slice(8,10));
+  return lm<ym ? 0 : null;
+}
+// 該列在「在職期間內」是否整月都沒有排班內容（離職日之後的欄位不算，那本來就該是空的）
+function schedRowBlank(r, ym){
+  var id=String(r["員工編號"]||"").trim();
+  ym = ym || (typeof SCHED_CACHE!=="undefined" && SCHED_CACHE ? SCHED_CACHE.ym : "");
+  var cut = ym ? leaveCutDay(id, ym) : null;
+  for(var d=1; d<=31; d++){
+    if(cut!==null && d>cut) continue;                       // 離職日之後：一律視為空白
+    if(String(r[String(d)]==null?"":r[String(d)]).trim()) return false;
+  }
+  return true;
+}
+function renderSchedCal(ym, rows, weekIdx){
+  var box=$("schCal"); if(!box) return;
+  var allRows=(rows||[]).filter(function(r){ return String(r["員工編號"]||"").trim(); });
+  // 2026-09-21(5)：離職員工的「空白班表」不顯示（整月都空的列＝雜訊）
+  var real=allRows.filter(function(r){
+    return !(isResigned(String(r["員工編號"]||"").trim()) && schedRowBlank(r, ym));
+  });
+  if(!real.length){
+    box.innerHTML = allRows.length
+      ? '<span class="muted">該月尚無排班（離職員工的空白班表已隱藏）</span>'
+      : '<span class="muted">該月尚無排班（請確認主檔已上傳排班到雲端）</span>';
+    return;
+  }
+  var weeks=schedWeeksOf(ym);
+  var wk=weeks[weekIdx] || {days:[0]};
+  var m=Number(ym.slice(5,7));
+  var COLS=weekColDays(ym, wk);
+  var DOW=["一","二","三","四","五","六","日"];   // 週一為始，與專案週別定義（週一至週日制）一致
+  var head='<div class="schrow hd"><div class="nm">員工</div>'
+    + DOW.map(function(t,i){
+        var d=COLS[i];
+        return '<div class="dy">'+(d? (m+"/"+d) : "—")+'<span class="dw">'+t+'</span></div>';
+      }).join("") + '</div>';
+  var body=real.map(function(r){
+    var id=String(r["員工編號"]||"").trim();
+    var nm=String(r["姓名"]||"").trim();
+    // 2026-09-21(6)：最後排班日＝離職日 → 離職日之後的欄位一律留白（資料仍保留在雲端）
+    var cut=leaveCutDay(id, ym);
+    var tds="";
+    for(var i=0;i<7;i++){
+      var d=COLS[i];
+      var v = (d!=null && !(cut!==null && d>cut)) ? String(r[String(d)]==null?"":r[String(d)]).trim() : "";
+      tds+='<div class="dy">'+(v? schedCell(v):"")+'</div>';
+    }
+    var note = cut===null ? "" : '<br><i class="rsg">離職'+(cut>0? (" "+m+"/"+cut) : "")+'</i>';
+    return '<div class="schrow"><div class="nm">'+esc(nm)+'<br><i>'+esc(id)+'</i>'+note+'</div>'+tds+'</div>';
+  }).join("");
+  box.innerHTML='<div class="schlist">'+head+body+'</div>';
+}
+// 格內容：只顯示 24H 時間（上下班分兩行）；休＝排休；假別＋時數＝算上班；其餘紅底。
+function schedCell(v){
+  var raw=String(v==null?"":v).trim();
+  if(!raw) return "";
+  var src=LEGACY_CODE[raw.toUpperCase()] || raw;      // 舊代碼自動展開
+  if(src==="休") return '<span class="cd r">休</span>';
+  if(/^\d{1,2}:\d{2}/.test(src)){
+    var parts=src.split(";");
+    var first=(/^(\d{1,2}:\d{2})/.exec(parts[0])||[])[1]||"";
+    var last=(/(\d{1,2}:\d{2})\s*$/.exec(parts[parts.length-1])||[])[1]||"";
+    if(first) return '<span class="cd t"><span class="l1">'+esc(first)+'</span>'
+                    + (last? '<span class="l2">'+esc(last)+'</span>' : "")+'</span>';
+  }
+  var lv=/^([^\d\s:.\-]{1,10})\s*([\d.]+)?\s*h?$/.exec(src);   // 年假8 / 年假 8h
+  if(lv){
+    var h=(lv[2]==null||lv[2]==="") ? "" : (Math.round(Number(lv[2])*10)/10)+"h";
+    return '<span class="cd v"><span class="l1">'+esc(lv[1])+'</span>'
+         + (h? '<span class="l2">'+esc(h)+'</span>' : "")+'</span>';
+  }
+  return '<span class="cd u">'+esc(raw)+'</span>';
+}
+// 靜態說明（不再需要班別對照表）
+function renderSchedLegend(){
+  var box=$("schLegend"); if(!box) return;
+  box.innerHTML='<span class="sw">格內＝上班–下班時間</span>'
+    + '<span class="sw">休＝排休</span><span class="sw">假別＋時數＝算上班</span>'
+    + '<span class="sw">空白＝未排班</span><span class="sw">離職日之後＝留白</span>';
+}
+// 排班資料快取：同一月份只向雲端要一次；切換「週」只重排不重抓。ym=null 表示「還沒載入過」。
+var SCHED_CACHE = { ym:null, rows:[] };
+// 下拉「週」選項：第一項為提示（未選＝不連雲端），其餘依該月週別（週一為始）列出 第N週 月/起–月/訖
+function populateWeekOptions(ym, keepIdx){
+  var sel=$("schWeek"); if(!sel) return;
+  var ws=schedWeeksOf(ym);
+  var m=Number(ym.slice(5,7));
+  var opts=['<option value="">請選擇週別…</option>'];
+  for(var i=0;i<ws.length;i++){
+    var s=ws[i].days[0], e=ws[i].days[ws[i].days.length-1];
+    opts.push('<option value="'+i+'">第 '+(i+1)+' 週　'+m+'/'+s+'–'+m+'/'+e+'</option>');
+  }
+  sel.innerHTML=opts.join("");
+  sel.value=(keepIdx!=="" && keepIdx!=null && ws[Number(keepIdx)]) ? String(keepIdx) : "";
+}
+// 依所選週別載入並顯示：未選週→不連雲端；同月已快取→直接重排；否則向雲端要一次。
+function loadSchedule(silent){
+  var ym=currentYm();
+  var wkSel=$("schWeek");
+  var box=$("schCal");
+  var weekIdx = wkSel ? Number(wkSel.value) : NaN;
+  if(!wkSel || wkSel.value==="" || isNaN(weekIdx)){
+    if(SCHED_CACHE.ym!==ym && box) box.innerHTML='<span class="muted">請選擇上方的週別以載入排班</span>';
+    return;
+  }
+  if(SCHED_CACHE.ym===ym){ renderSchedFromCache(weekIdx); return; }
+  if(box) box.innerHTML='<span class="muted">載入中…</span>';
+  google.script.run.withSuccessHandler(function(res){
+    var rows=(res && res.rows) ? res.rows : (res || []);
+    // 只留員工列（員工編號有值）；舊資料的「班別定義列」直接略過，不再需要
+    var real=[];
+    (rows||[]).forEach(function(r){
+      if(String(r["員工編號"]||"").trim()) real.push(r);
+    });
+    SCHED_CACHE.ym=ym; SCHED_CACHE.rows=real;
+    renderSchedFromCache(weekIdx);
+    renderSchedLegend();
+  }).withFailureHandler(function(e){
+    if(box) box.innerHTML='<span class="muted">排班載入失敗，請稍後重試</span>';
+  }).getSchedule(ym);
+}
+// 換年或換月：重列該月週別、清掉快取並回到「請選擇週別」（不主動連雲端）
+function onYmChange(){
+  var ym=currentYm();
+  populateWeekOptions(ym, null);
+  SCHED_CACHE.ym=null; SCHED_CACHE.rows=[];
+  var box=$("schCal");
+  if(box) box.innerHTML='<span class="muted">請選擇上方的週別以載入排班</span>';
+}
+// 用快取重排（切週時呼叫，不重抓雲端）
+function renderSchedFromCache(weekIdx){
+  if(!SCHED_CACHE.ym) return;
+  renderSchedCal(SCHED_CACHE.ym, SCHED_CACHE.rows, weekIdx);
+}
+// 員工名單（狀態）更新後重排一次（不重抓雲端）；沒選週／沒載入過就不動
+function rerenderSchedIfLoaded(){
+  if(!SCHED_CACHE.ym) return;
+  var w=$("schWeek");
+  if(!w || w.value==="") return;
+  var i=Number(w.value);
+  if(isNaN(i)) return;
+  renderSchedCal(SCHED_CACHE.ym, SCHED_CACHE.rows, i);
+}
+
+// 回到前景（切回分頁／解鎖手機）：名單靜默更新；排班「已載入過」才跟著刷新（沒選週就不連雲端）
+document.addEventListener("visibilitychange", function(){
+  if(document.visibilityState==="visible" && Date.now()-State.lastLoadAt>30000){
+    loadEmpOptions(true); if(SCHED_CACHE.ym) loadSchedule(true);
+  }
+});
+window.addEventListener("pageshow", function(){ loadEmpOptions(true); if(SCHED_CACHE.ym) loadSchedule(true); });
+window.addEventListener("focus", function(){ if(SCHED_CACHE.ym) loadSchedule(true); });
+
+// 手動重新整理：清快取後強制重抓（未選週時只提示，不連雲端）
+function refreshSchedCal(){
+  var wk=$("schWeek");
+  if(!wk || wk.value===""){ var b=$("schCal"); if(b) b.innerHTML='<span class="muted">請先選擇週別再重新整理</span>'; return; }
+  SCHED_CACHE.ym=null; SCHED_CACHE.rows=[];   // 清快取 → 強制重抓
+  loadSchedule(false);
+}
+(function initSched(){
+  populateYearOptions(null);                  // 本年 ±1（純本機清單，不連雲端）
+  populateMonthOptions(null);                 // 1~12 月（純本機清單，不連雲端）
+  populateWeekOptions(currentYm(), null);      // 先列出本月週別，但不連雲端（開頁不預載）
+  var yr=$("schYear");
+  if(yr) yr.addEventListener("change", onYmChange);
+  var mo=$("schMonth");
+  if(mo) mo.addEventListener("change", onYmChange);
+  var wk=$("schWeek");
+  if(wk) wk.addEventListener("change", function(){ loadSchedule(false); });
+  var rb=$("schReload");
+  if(rb) rb.addEventListener("click", refreshSchedCal);
+})();
+
+// ===== 請假：員工申請（google.script.run.leaveAdd）＋ 我的請假查詢（leaveGetMy） =====
+// 手機頁是 Apps Script 服務的頁面 → 直接 google.script.run 呼叫 GAS，不需 JSONP / fetch。
+// 兩個區塊「開頁都不載入資料」：請假申請送出才寫雲端；我的請假按查詢才抓自己的。
+var LEAVE_TYPES=["特休","病假","事假","婚假","喪假","產假","陪產假","公假","產檢假","生理假","家庭照顧假","補休","其他"];
+// 員工編號＋PIN 驗證：改由**雲端伺服器**比對（verifyEmpPin），前端不再取得全店 PIN 清單。
+// cb(emp, err)：成功 emp={"員工編號","姓名"}；失敗 err=錯誤訊息。
+function verifyEmp(id, pin, cb){
+  id=String(id==null?"":id).trim().toUpperCase(); pin=String(pin==null?"":pin);
+  google.script.run.withSuccessHandler(function(res){
+    if(res && res.ok && res.emp) return cb(res.emp, null);
+    var msg=(res && res.error)||"員工編號或 PIN 錯誤。";
+    // 名單可能已更新（例如剛新增員工）→ 靜默重抓下拉，不影響本次錯誤提示
+    if(msg.indexOf("員工編號或 PIN")>=0 || msg.indexOf("尚未設定")>=0) loadEmpOptions(true);
+    cb(null, msg);
+  }).withFailureHandler(function(e){ cb(null,"驗證失敗："+(e&&e.message||e)); }).verifyEmpPin(id, pin);
+}
+// ===== 我的出勤：統一登入一次（編號＋PIN），登入後展開 5 個申請/查詢標題 =====
+// 登入按鈕：驗證編號＋PIN（與 tryPunch 同一套 verifyEmp），成功後顯示「已登入」並展開 5 個標題
+function loginAtt(){
+  var id=getVal("attId").trim().toUpperCase(), pin=getVal("attPin");
+  if(!id||!pin) return showMsg("attLoginMsg","請選擇員工並輸入 PIN 再登入。","err");
+  showMsg("attLoginMsg","驗證中…","info");
+  verifyEmp(id,pin,function(emp,err){
+    if(err) return showMsg("attLoginMsg",err,"err");
+    if(!emp) return showMsg("attLoginMsg","員工編號或 PIN 錯誤。","err");
+    State.att={ 編號:emp["員工編號"], 姓名:emp["姓名"], _pin:pin };
+    showMsg("attLoginMsg","✅ 已登入："+esc(emp["姓名"])+"（"+esc(emp["員工編號"])+"）","ok");
+    var body=$("attBody"); if(body) body.style.display="block";
+  });
+}
+// 通用展開/收合；onOpen 在「展開」時觸發（查詢標題用來自動抓資料）
+function attToggle(bodyId, caretId, onOpen){
+  var b=$(bodyId), c=$(caretId); if(!b) return;
+  var open = b.style.display !== "none";
+  if(open){ b.style.display="none"; if(c) c.textContent="▸"; }
+  else { b.style.display="block"; if(c) c.textContent="▾"; if(onOpen) onOpen(); }
+}
+function promptLogin(boxId){
+  showMsg(boxId, "請先點上方「登入我的出勤」輸入員工編號與 PIN。", "err");
+}
+function leaveDays(s,e){ var a=Date.parse(s), b=Date.parse(e); if(isNaN(a)||isNaN(b)) return 0; return Math.round((b-a)/86400000)+1; }
+function toHHMM(h){ var p=String(h||"").split(":"); if(p.length<2) return NaN; return Number(p[0])+Number(p[1])/60; }
+// 時數自動算：有填時間＝天數 ×（結束−開始）；未填時間＝整天 8h
+function computeLeaveHours(s,e,stt,ent){
+  var d=leaveDays(s,e); if(!d) return 0;
+  if(stt && ent){ var h=toHHMM(ent)-toHHMM(stt); if(!(h>0)) h=0; return Math.round(d*h*10)/10; }
+  return d*8;
+}
+function updateLeaveHoursPreview(){
+  var s=getVal("lvStart"), e=getVal("lvEnd")||s;
+  var box=$("lvHoursPreview");
+  if(!box) return;
+  if(!s){ box.textContent=""; return; }
+  var d=leaveDays(s,e); if(!d){ box.textContent="日期無效"; return; }
+  box.textContent="共 "+d+" 天";
+}
+function submitLeave(){
+  var id=getVal("attId").trim().toUpperCase(), pin=getVal("attPin");
+  if(!id||!pin) return showMsg("leaveNote","請先選擇員工並輸入 PIN。","err");
+  var type=getVal("lvType"); if(!type) return showMsg("leaveNote","請選擇請假假別。","err");
+  var s=getVal("lvStart"); if(!s) return showMsg("leaveNote","請填寫請假日期（起）。","err");
+  var e=getVal("lvEnd")||s; if(e<s) return showMsg("leaveNote","請假日期（迄）不可早於（起）。","err");
+  var hours=Number(getVal("lvHours"));
+  if(!(hours>0)) return showMsg("leaveNote","請填寫請假時數（不含休息時間）。","err");
+  hours=Math.round(hours*10)/10;
+  showMsg("leaveNote","驗證中…","info");
+  verifyEmp(id,pin,function(emp,err){
+    if(err) return showMsg("leaveNote",err,"err");
+    if(!emp) return showMsg("leaveNote","員工編號或 PIN 錯誤。","err");
+    var rec={ "序號":"L"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+      "員工編號":emp["員工編號"], "姓名":emp["姓名"], "假別":type,
+      "起始日":s, "結束日":e, "開始時間":"", "結束時間":"",
+      "時數":hours, "狀態":"申請中", "申請時間":stamp14(), "處理時間":"", "處理備註":"" };
+    showMsg("leaveNote","送出中…","info");
+    google.script.run.withSuccessHandler(function(d){
+      if(d&&d.ok===false) return showMsg("leaveNote","雲端回報失敗："+(d.error||""),"err");
+      // 讀回覆核：雲端必須回報同一組序號。回傳序號不符＝其實沒寫進去（例如舊版 GAS）。
+      if(!d || String(d.id||"") !== String(rec["序號"]))
+        return showMsg("leaveNote","雲端未正確寫入（回傳序號不符），請確認 Apps Script 已部署新版後重送。","err");
+      showMsg("leaveNote","✅ 已送出請假申請（"+esc(type)+" "+s+(e!==s?("~"+e):"")+"，共 "+hours+" 小時），待雇主核准。","ok");
+      setVal("attPin",""); setVal("lvStart",""); setVal("lvEnd",""); setVal("lvHours",""); setText("lvHoursPreview","");
+    }).withFailureHandler(function(ee){ showMsg("leaveNote","送出失敗："+(ee&&ee.message||ee),"err"); }).leaveAdd(rec);
+  });
+}
+function queryMyLeaves(){
+  var id=getVal("attId").trim().toUpperCase(), pin=getVal("attPin");
+  if(!id||!pin) return showMsg("leaveMyList","請先選擇員工並輸入 PIN。","err");
+  // 防呆：手機頁必須由 Apps Script 部署後開啟，google.script.run 才存在；直接開本機檔會靜默失敗
+  if(typeof google==="undefined" || !google.script || !google.script.run){
+    return showMsg("leaveMyList","此頁必須由雲端 Apps Script 開啟（部署後的網址），直接開本機檔無法連線查詢。","err");
+  }
+  showMsg("leaveMyList","驗證中…","info");
+  verifyEmp(id,pin,function(emp,err){
+    if(err) return showMsg("leaveMyList",err,"err");
+    if(!emp) return showMsg("leaveMyList","員工編號或 PIN 錯誤。","err");
+    google.script.run.withSuccessHandler(function(rows){
+      // ❗ google.script.run 回傳的陣列是「另一 realm 的 Array」，`rows instanceof Array` 會失效
+      //    （回 false → State.myLeaves 被設成 [] → 手機永遠查無）。改用 Array.isArray() 跨 realm 都有效。
+      State.myLeaves = Array.isArray(rows) ? rows : [];
+      // 依資料實際出現過的年份補進「查詢年」下拉（與年度±1 併集）
+      var yrs = {};
+      State.myLeaves.forEach(function(r){ var y=ymOf(r["起始日"]).slice(0,4); if(y) yrs[y]=1; });
+      populateLeaveMyYear(Object.keys(yrs));
+      renderMyLeaves();
+    }).withFailureHandler(function(ee){
+      var m=String((ee&&ee.message)||ee);
+      // 症狀：線上 GAS 尚未部署含 leaveGetMy 的新版本 → 回「找不到函式」。
+      // 轉成可執行的一句話，避免使用者只看到「查詢失敗」而不知道要重新部署。
+      if(/not found|is not defined|找不到|未定義/i.test(m)){
+        m=m+"（雲端 Apps Script 尚未部署含 leaveGetMy 的新版本：請更新程式碼後「建立新版本」再重新部署）";
+      }
+      showMsg("leaveMyList","查詢失敗："+m,"err");
+    }).leaveGetMy(id);   // 用「下拉輸入的 id」（verifyEmp 驗證同一來源），不用 emp 物件值——避免雲端員工編號帶不可見字元時比對失敗
+  });
+}
+// 由「起始日」取 ym（YYYY-MM）；非日期字串回空
+function ymOf(s){ var m=/^(\d{4})-(\d{2})/.exec(String(s==null?"":s).trim()); return m? (m[1]+"-"+m[2]) : ""; }
+function populateLeaveMyYear(extraYears){
+  var sel=$("lvMyYear"); if(!sel) return;
+  var cur=sel.value;                       // 保留當前選中，避免 innerHTML 重設後值亂跳
+  var cy=new Date().getFullYear();
+  var set={}; [cy-1,cy,cy+1].forEach(function(y){ set[y]=1; });
+  (extraYears||[]).forEach(function(y){ set[String(y)]=1; });
+  var arr=Object.keys(set).map(Number).sort(function(a,b){return b-a;});
+  var opts='<option value="">全部年份</option>';
+  arr.forEach(function(y){ opts += '<option value="'+y+'">'+y+' 年</option>'; });
+  sel.innerHTML=opts;
+  // 若當前值仍有效就保留，否則回到「全部年份」
+  var valid=(cur==="") || arr.indexOf(Number(cur))>=0;
+  sel.value=valid?cur:"";
+}
+function populateLeaveMyMonth(){
+  var sel=$("lvMyMonth"); if(!sel) return;
+  sel.innerHTML='<option value="">全部月份</option>'+[1,2,3,4,5,6,7,8,9,10,11,12].map(function(m){
+    var v=("0"+m).slice(-2); return '<option value="'+v+'">'+m+' 月</option>';
+  }).join("");
+}
+// 顯示「我的請假」：先做年/月篩選（以起始日所屬年月比對），再只列 姓名/假別/起始/結束/時數/核准狀態
+// 清除「我的請假」年/月篩選並重新渲染
+function clearLeaveFilter(){ setVal("lvMyYear",""); setVal("lvMyMonth",""); renderMyLeaves(); }
+function renderMyLeaves(){
+  var box=$("leaveMyList"); if(!box) return;
+  box.style.textAlign="left"; box.className="meta";
+  var who=String(getVal("attId")||"").trim();
+  var y=getVal("lvMyYear"), m=getVal("lvMyMonth");
+  var rows=(State.myLeaves||[]).filter(function(r){
+    var ym=ymOf(r["起始日"]);
+    if(y && ym.slice(0,4)!==y) return false;
+    if(m && ym.slice(5,7)!==m) return false;
+    return true;
+  });
+  var yDisp=y? (y+" 年") : "全部年份";
+  var mDisp=m? (m+" 月") : "全部月份";
+  if(!rows.length){
+    var why = (State.myLeaves&&State.myLeaves.length)
+      ? "（已依「"+esc(yDisp)+" / "+esc(mDisp)+"」篩選後無符合；原始資料共 "+State.myLeaves.length+" 筆，可改選「全部年份/月份」）"
+      : (who?("（員工編號 "+esc(who)+"）"):"");
+    box.innerHTML='<span class="muted">查無請假紀錄'+why+'</span>'
+      +'<br><a href="javascript:void(0)" onclick="clearLeaveFilter()" style="color:#2563eb;font-size:12px;display:inline-block;margin:calc(var(--u)*.25) 0">[顯示全部資料]</a>'
+      +'<br><span class="muted" style="font-size:11px">若剛送出申請，請確認員工編號是否正確；仍為空請確認：①雲端試算表「請假」分頁確實有該員工資料 ②Apps Script 已「建立新版本」重新部署 ③本手機頁（PunchPage）也已更新進 Apps Script 專案。</span>';
+    return;
+  }
+  rows.sort(function(a,b){ return String(b["申請時間"]||"").localeCompare(String(a["申請時間"]||"")); });
+  box.innerHTML = '<div class="muted" style="margin-bottom:calc(var(--u)*.25)">查詢結果：共 '+rows.length+' 筆（'+esc(yDisp)+' / '+esc(mDisp)+'）</div>'
+    + rows.map(function(r){
+    var st=String(r["狀態"]||"申請中");
+    var cls = st==="核准"?"ok": st==="退回"?"err":"info";
+    var d1=normDateStr(r["起始日"]), d2=normDateStr(r["結束日"]);
+    return '<div style="padding:calc(var(--u)*.4) 0;border-bottom:1px solid #eef1f5">'
+      + '<b>'+esc(r["姓名"]||"")+'</b>　'+esc(r["假別"]||"")
+      + '　'+esc(d1||r["起始日"]||"")+(d2&&d2!==d1?("~"+esc(d2)):"")
+      + (r["時數"]?('　'+esc(r["時數"])+' 小時'):"")
+      + '　<span class="msg '+cls+'" style="display:inline-block;padding:2px 8px">'+esc(st)+'</span>'
+      + '</div>';
+  }).join("");
+}
+function toggleLeavePanel(){
+  attToggle("attApplyLeaveBody","attApplyLeaveCaret");
+}
+function toggleLeaveMy(){
+  attToggle("attQueryLeaveBody","attQueryLeaveCaret", function(){ if(State.att) queryMyLeaves(); else promptLogin("leaveMyList"); });
+}
+
+// ===== 我的打卡：員工查自己某年某月的打卡時間（PIN 把關，雲端只回該員該月） =====
+// 與「我的請假」同模式：開頁不載入，展開後按「查詢我的打卡」才向雲端抓自己的。
+function populatePunchMyYear(){
+  var sel=$("pkMyYear"); if(!sel) return;
+  var cy=new Date().getFullYear();
+  sel.innerHTML='<option value="">選年份</option>'
+    + [cy-1,cy,cy+1].map(function(y){ return '<option value="'+y+'">'+y+' 年</option>'; }).join("");
+  sel.value=String(cy);
+}
+function populatePunchMyMonth(){
+  var sel=$("pkMyMonth"); if(!sel) return;
+  var cm=("0"+(new Date().getMonth()+1)).slice(-2);
+  sel.innerHTML=[1,2,3,4,5,6,7,8,9,10,11,12].map(function(m){
+    var v=("0"+m).slice(-2); return '<option value="'+v+'">'+m+' 月</option>';
+  }).join("");
+  sel.value=cm;
+}
+function togglePunchMy(){
+  attToggle("attQueryPunchBody","attQueryPunchCaret", function(){ if(State.att) queryMyPunches(); else promptLogin("punchMyList"); });
+}
+function queryMyPunches(){
+  var id=getVal("attId").trim().toUpperCase(), pin=getVal("attPin");
+  if(!id||!pin) return showMsg("punchMyList","請先選擇員工並輸入 PIN。","err");
+  var y=getVal("pkMyYear"), m=getVal("pkMyMonth");
+  if(!y||!m) return showMsg("punchMyList","請選擇查詢年與月。","err");
+  if(typeof google==="undefined" || !google.script || !google.script.run){
+    return showMsg("punchMyList","此頁必須由雲端 Apps Script 開啟（部署後的網址），直接開本機檔無法連線查詢。","err");
+  }
+  var ym=y+"-"+m;
+  showMsg("punchMyList","驗證中…","info");
+  verifyEmp(id,pin,function(emp,err){
+    if(err) return showMsg("punchMyList",err,"err");
+    if(!emp) return showMsg("punchMyList","員工編號或 PIN 錯誤。","err");
+    google.script.run.withSuccessHandler(function(rows){
+      State.myPunches = Array.isArray(rows) ? rows : [];
+      renderMyPunches();
+    }).withFailureHandler(function(ee){
+      var msg=String((ee&&ee.message)||ee);
+      if(/not found|is not defined|找不到|未定義/i.test(msg)){
+        msg+="（雲端 Apps Script 尚未部署含 getPunchesMy 的新版本：請更新程式碼後「建立新版本」再重新部署）";
+      }
+      showMsg("punchMyList","查詢失敗："+msg,"err");
+    }).getPunchesMy(id, ym);
+  });
+}
+// 依日期分組：每天列出 上班／休息開始／休息結束／下班 的時間戳（含非「正常」判定的小字備註）
+function renderMyPunches(){
+  var box=$("punchMyList"); if(!box) return;
+  box.style.textAlign="left"; box.className="meta";
+  var rows=(State.myPunches||[]);
+  if(!rows.length){
+    box.innerHTML='<span class="muted">查無打卡紀錄（員工編號 '+esc(getVal("attId"))+'，'+esc(getVal("pkMyYear"))+'/'+esc(getVal("pkMyMonth"))+'）</span>'
+      +'<br><span class="muted" style="font-size:11px">仍為空請確認：①雲端試算表該月打卡分頁確實有該員資料 ②Apps Script 已「建立新版本」重新部署 ③本手機頁（PunchPage）也已更新進 Apps Script 專案。</span>';
+    return;
+  }
+  var byDay={};
+  rows.forEach(function(r){
+    var ts=String(r["時間戳"]||"").trim(); if(!ts) return;
+    var day=ts.slice(0,10);
+    (byDay[day]=byDay[day]||[]).push(r);
+  });
+  var days=Object.keys(byDay).sort();
+  var clsMap={ "上班":"on", "下班":"off", "休息開始":"ron", "休息結束":"roff" };
+  box.innerHTML = '<div class="muted" style="margin-bottom:calc(var(--u)*.25)">查詢結果：共 '+rows.length+' 筆（'+esc(getVal("pkMyYear"))+'/'+esc(getVal("pkMyMonth"))+'）</div>'
+    + days.map(function(day){
+    var list=byDay[day];
+    list.sort(function(a,b){ return String(a["時間戳"]).localeCompare(String(b["時間戳"])); });
+    var chips=list.map(function(r){
+      var t=String(r["時間戳"]||"").slice(11,16);       // HH:MM
+      var typ=String(r["類型"]||"");
+      var cls=clsMap[typ]||"off";
+      var jt=String(r["判定"]||"正常");
+      var jtTag = (jt && jt!=="正常") ? '<span class="jt">'+esc(jt)+'</span>' : "";
+      return '<span class="pch '+cls+'">'+esc(typ)+' '+esc(t)+jtTag+'</span>';
+    }).join(" ");
+    return '<div style="padding:calc(var(--u)*.4) 0;border-bottom:1px solid #eef1f5"><b>'+esc(day)+'</b><br>'+chips+'</div>';
+  }).join("");
+}
+(function initLeave(){
+  var lt=$("lvType");
+  if(lt) lt.innerHTML=LEAVE_TYPES.map(function(x){return '<option>'+esc(x)+'</option>';}).join("");
+  populateLeaveMyYear([]);
+  populateLeaveMyMonth();
+  var bs=$("btnLeaveSubmit"); if(bs) bs.addEventListener("click", submitLeave);
+  var bm=$("btnLeaveMy"); if(bm) bm.addEventListener("click", queryMyLeaves);
+  var lt2=$("attApplyLeaveToggle"); if(lt2) lt2.addEventListener("click", toggleLeavePanel);
+  var lt3=$("attQueryLeaveToggle"); if(lt3) lt3.addEventListener("click", toggleLeaveMy);
+  // 我的出勤：登入＋更新名單
+  var la=$("btnAttLogin"); if(la) la.addEventListener("click", loginAtt);
+  var lrf=$("btnAttRefresh"); if(lrf) lrf.addEventListener("click", function(){ refreshEmpOptions(); });
+  // 年/月變動時只重篩已抓回的資料，不必再打雲端
+  ["lvMyYear","lvMyMonth"].forEach(function(id){
+    var el=$(id); if(el) el.addEventListener("change", function(){ if((State.myLeaves||[]).length) renderMyLeaves(); });
+  });
+  ["lvStart","lvEnd"].forEach(function(id){
+    var el=$(id); if(el) el.addEventListener("change", updateLeaveHoursPreview);
+  });
+})();
+
+// ===== 加班申請（google.script.run.otAdd）＋ 我的加班（otGetMy） =====
+// 與請假鏈同構（2026-09-25 階段二）。額外把關：
+//   ① 申請時段不得與當日「排班時段」重疊（排班內的工時不用申請，避免同一小時算兩次）
+//   ② 加班日起申請期限（測試期間暫不限制；常數 OT_WINDOW_DAYS，恢復時設回 7）
+//   ③ 結束須晚於開始（跨日加班請分兩筆）
+var OT_WINDOW_DAYS = 36500;   // ⚠ 測試期間暫時開放：不限申請期限（恢復時改回 7）
+function toMin(hm){
+  var m=/^(\d{1,2}):(\d{2})$/.exec(String(hm==null?"":hm).trim());
+  return m? (Number(m[1])*60+Number(m[2])) : NaN;
+}
+/* 休息時數：選填（小時，可小數）；留空／非法／負數一律視為 0。 */
+function otRestHours(){
+  var v=Number(getVal("otRest"));
+  return (isFinite(v) && v>0) ? Math.round(v*100)/100 : 0;
+}
+function updateOtHoursPreview(){
+  var a=toMin(getVal("otStart")), b=toMin(getVal("otEnd"));
+  var box=$("otHoursPreview"); if(!box) return;
+  if(isNaN(a)||isNaN(b)){ box.textContent=""; return; }
+  var h=(b-a)/60;
+  if(!(h>0)){ box.textContent="結束時間須晚於開始時間（跨日加班請分兩筆申請）"; return; }
+  var rest=otRestHours();
+  var raw=Math.round(h*100)/100, net=Math.round((h-rest)*100)/100;
+  box.textContent = rest>0
+    ? ("加班時數 "+raw+" 小時 − 休息 "+rest+" 小時 ＝ "+(net>0?net:0)+" 小時")
+    : ("加班時數 "+raw+" 小時（中途有休息請填「休息時數」扣除）");
+}
+/* 解析排班格的多段時間 → [{a,b}]（分鐘）。格內容："09:00-18:00"、多段 "11:00-14:00;17:00-21:00"、
+   "休"＝排休、假別（如 "年假8"）／空白＝無上班時段。與 schedCell() 同一套解析（含舊代碼展開）。 */
+function schedSegsOf(cell){
+  var raw=String(cell==null?"":cell).trim();
+  if(!raw) return [];
+  var src=LEGACY_CODE[raw.toUpperCase()] || raw;
+  if(src==="休") return [];
+  if(!/^\d{1,2}:\d{2}/.test(src)) return [];
+  return src.split(";").map(function(seg){
+    var m1=/(\d{1,2}:\d{2})/.exec(seg), m2=/(\d{1,2}:\d{2})\s*$/.exec(seg);
+    if(!m1||!m2) return null;
+    var a=toMin(m1[1]), b=toMin(m2[1]);
+    if(isNaN(a)||isNaN(b)||b<=a) return null;
+    return {a:a,b:b};
+  }).filter(Boolean);
+}
+function otOverlapsSched(segs, a, b){
+  return (segs||[]).some(function(s){ return a < s.b && s.a < b; });
+}
+function submitOt(){
+  var id=getVal("attId").trim().toUpperCase(), pin=getVal("attPin");
+  if(!id||!pin) return showMsg("otNote","請先選擇員工並輸入 PIN。","err");
+  var date=getVal("otDate");
+  if(!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return showMsg("otNote","請選擇加班日期。","err");
+  var a=toMin(getVal("otStart")), b=toMin(getVal("otEnd"));
+  if(isNaN(a)||isNaN(b)) return showMsg("otNote","請填寫開始與結束時間。","err");
+  if(b<=a) return showMsg("otNote","結束時間須晚於開始時間（跨日加班請分兩筆申請）。","err");
+  var rest=otRestHours(), span=Math.round(((b-a)/60)*100)/100;
+  var hours=Math.round(((b-a)/60 - rest)*100)/100;
+  if(rest > span) return showMsg("otNote","休息時數（"+rest+"h）不可大於加班時長（"+span+"h）。","err");
+  if(!(hours>0)) return showMsg("otNote","扣除休息後加班時數須大於 0，請確認時間與休息時數。","err");
+  var pay=getVal("otPay")||"加班費";
+  // 7 天窗口（手機本機日期初檢；GAS 端以伺服器日期複檢）
+  var now=new Date();
+  var todayStr=now.getFullYear()+"-"+("0"+(now.getMonth()+1)).slice(-2)+"-"+("0"+now.getDate()).slice(-2);
+  var diffDays=Math.round((new Date(todayStr+"T00:00:00") - new Date(date+"T00:00:00"))/86400000);
+  if(diffDays > OT_WINDOW_DAYS)
+    return showMsg("otNote","已超過加班日起 "+OT_WINDOW_DAYS+" 天的申請期限（"+date+"）。","err");
+  if(typeof google==="undefined" || !google.script || !google.script.run)
+    return showMsg("otNote","此頁必須由雲端 Apps Script 開啟（部署後的網址），直接開本機檔無法送出。","err");
+  showMsg("otNote","驗證中…","info");
+  verifyEmp(id,pin,function(emp,err){
+    if(err) return showMsg("otNote",err,"err");
+    if(!emp) return showMsg("otNote","員工編號或 PIN 錯誤。","err");
+    // 該月排班：有快取且同月就用快取；否則向雲端抓一次（只為檢查重疊，不寫回排班快取，
+    //   避免排班頁的下拉月份與快取月份不一致）
+    var ym=date.slice(0,7), day=Number(date.slice(8,10));
+    var useCache = (SCHED_CACHE.ym===ym && SCHED_CACHE.rows && SCHED_CACHE.rows.length);
+    var afterSched=function(rows){
+      var row=(rows||[]).find(function(r){ return String(r["員工編號"]||"").trim().toUpperCase()===String(emp["員工編號"]).trim().toUpperCase(); });
+      var cell=row? String(row[String(day)]==null?"":row[String(day)]).trim() : "";
+      var segs=schedSegsOf(cell);
+      if(otOverlapsSched(segs,a,b))
+        return showMsg("otNote","申請時段與當日排班重疊（排班＝"+esc(cell)+"）。排班內的工時不用申請加班，請改成排班「以外」的時段。","err");
+      var rec={ "序號":"O"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+        "員工編號":emp["員工編號"], "姓名":emp["姓名"], "加班日期":date,
+        "開始時間":getVal("otStart"), "結束時間":getVal("otEnd"), "休息時數":rest, "時數":hours,
+        "補償方式":pay, "事由":getVal("otMemo").trim(),
+        "狀態":"申請中", "申請時間":stamp14(), "處理時間":"", "處理備註":"", "刪除時間":"", "刪除備註":"" };
+      showMsg("otNote","送出中…","info");
+      google.script.run.withSuccessHandler(function(d){
+        if(d&&d.ok===false) return showMsg("otNote","雲端回報失敗："+(d.error||""),"err");
+        // 讀回覆核：雲端必須回報同一組序號（舊版 GAS 沒有 otAdd → 序號不符）
+        if(!d || String(d.id||"") !== String(rec["序號"]))
+          return showMsg("otNote","雲端未正確寫入（回傳序號不符），請確認 Apps Script 已部署新版後重送。","err");
+        showMsg("otNote","✅ 已送出加班申請（"+date+" "+rec["開始時間"]+"–"+rec["結束時間"]+(rest>0?("，休息 "+rest+"h"):"")+"，共 "+hours+" 小時・"+esc(pay)+"），待雇主核准。","ok");
+        setVal("attPin",""); setVal("otDate",""); setVal("otStart",""); setVal("otEnd",""); setVal("otRest",""); setVal("otMemo",""); setText("otHoursPreview","");
+      }).withFailureHandler(function(ee){ showMsg("otNote","送出失敗："+(ee&&ee.message||ee),"err"); }).otAdd(rec);
+    };
+    if(useCache){ afterSched(SCHED_CACHE.rows); return; }
+    google.script.run.withSuccessHandler(function(res){ afterSched((res&&res.rows)||[]); })
+      .withFailureHandler(function(ee){
+        showMsg("otNote","排班讀取失敗，無法檢查時段重疊："+esc(ee&&ee.message||ee)+"（請稍後再試；真的送不出去可先向雇主口頭報備。）","err");
+      }).getSchedule(ym);
+  });
+}
+function queryMyOts(){
+  var id=getVal("attId").trim().toUpperCase(), pin=getVal("attPin");
+  if(!id||!pin) return showMsg("otMyList","請先選擇員工並輸入 PIN。","err");
+  if(typeof google==="undefined" || !google.script || !google.script.run)
+    return showMsg("otMyList","此頁必須由雲端 Apps Script 開啟（部署後的網址），直接開本機檔無法連線查詢。","err");
+  showMsg("otMyList","驗證中…","info");
+  verifyEmp(id,pin,function(emp,err){
+    if(err) return showMsg("otMyList",err,"err");
+    if(!emp) return showMsg("otMyList","員工編號或 PIN 錯誤。","err");
+    google.script.run.withSuccessHandler(function(rows){
+      State.myOts = Array.isArray(rows) ? rows : [];   // Array.isArray：跨 realm 也有效（與我的請假同招）
+      var yrs={};
+      State.myOts.forEach(function(r){ var y=ymOf(r["加班日期"]).slice(0,4); if(y) yrs[y]=1; });
+      populateOtMyYear(Object.keys(yrs));
+      renderMyOts();
+    }).withFailureHandler(function(ee){
+      var m=String((ee&&ee.message)||ee);
+      if(/not found|is not defined|找不到|未定義/i.test(m)){
+        m+="（雲端 Apps Script 尚未部署含 otGetMy 的新版本：請更新程式碼後「建立新版本」再重新部署）";
+      }
+      showMsg("otMyList","查詢失敗："+m,"err");
+    }).otGetMy(id);   // 用「下拉輸入的 id」（與我的請假同一套零寬字元考量）
+  });
+}
+function populateOtMyYear(extraYears){
+  var sel=$("otMyYear"); if(!sel) return;
+  var cur=sel.value;
+  var cy=new Date().getFullYear();
+  var set={}; [cy-1,cy,cy+1].forEach(function(y){ set[y]=1; });
+  (extraYears||[]).forEach(function(y){ set[String(y)]=1; });
+  var arr=Object.keys(set).map(Number).sort(function(a,b){return b-a;});
+  var opts='<option value="">全部年份</option>';
+  arr.forEach(function(y){ opts += '<option value="'+y+'">'+y+' 年</option>'; });
+  sel.innerHTML=opts;
+  var valid=(cur==="") || arr.indexOf(Number(cur))>=0;
+  sel.value=valid?cur:"";
+}
+function populateOtMyMonth(){
+  var sel=$("otMyMonth"); if(!sel) return;
+  sel.innerHTML='<option value="">全部月份</option>'+[1,2,3,4,5,6,7,8,9,10,11,12].map(function(m){
+    var v=("0"+m).slice(-2); return '<option value="'+v+'">'+m+' 月</option>';
+  }).join("");
+}
+function clearOtFilter(){ setVal("otMyYear",""); setVal("otMyMonth",""); renderMyOts(); }
+function renderMyOts(){
+  var box=$("otMyList"); if(!box) return;
+  box.style.textAlign="left"; box.className="meta";
+  var who=String(getVal("attId")||"").trim();
+  var y=getVal("otMyYear"), m=getVal("otMyMonth");
+  var rows=(State.myOts||[]).filter(function(r){
+    var ym=ymOf(r["加班日期"]);
+    if(y && ym.slice(0,4)!==y) return false;
+    if(m && ym.slice(5,7)!==m) return false;
+    return true;
+  });
+  var yDisp=y? (y+" 年") : "全部年份";
+  var mDisp=m? (m+" 月") : "全部月份";
+  if(!rows.length){
+    var why = (State.myOts&&State.myOts.length)
+      ? "（已依「"+esc(yDisp)+" / "+esc(mDisp)+"」篩選後無符合；原始資料共 "+State.myOts.length+" 筆）"
+      : (who?("（員工編號 "+esc(who)+"）"):"");
+    box.innerHTML='<span class="muted">查無加班申請'+why+'</span>'
+      +'<br><a href="javascript:void(0)" onclick="clearOtFilter()" style="color:#2563eb;font-size:12px;display:inline-block;margin:calc(var(--u)*.25) 0">[顯示全部資料]</a>'
+      +'<br><span class="muted" style="font-size:11px">若剛送出申請，請確認員工編號是否正確；仍為空請確認：①雲端試算表「加班」分頁確實有該員工資料 ②Apps Script 已「建立新版本」重新部署 ③本手機頁（PunchPage）也已更新進 Apps Script 專案。</span>';
+    return;
+  }
+  rows.sort(function(a,b){ return String(b["申請時間"]||"").localeCompare(String(a["申請時間"]||"")); });
+  box.innerHTML = '<div class="muted" style="margin-bottom:calc(var(--u)*.25)">查詢結果：共 '+rows.length+' 筆（'+esc(yDisp)+' / '+esc(mDisp)+'）</div>'
+    + rows.map(function(r){
+    var st=String(r["狀態"]||"申請中");
+    var cls = st==="核准"?"ok": st==="退回"?"err":"info";
+    return '<div style="padding:calc(var(--u)*.4) 0;border-bottom:1px solid #eef1f5">'
+      + '<b>'+esc(r["加班日期"]||"")+'</b>　'+esc(r["開始時間"]||"")+'–'+esc(r["結束時間"]||"")
+      + (r["時數"]?('　'+esc(r["時數"])+' 小時'):"")
+      + (Number(r["休息時數"])>0?('（含休息 '+esc(r["休息時數"])+'h）'):"")
+      + '　'+esc(r["補償方式"]||"")
+      + '　<span class="msg '+cls+'" style="display:inline-block;padding:2px 8px">'+esc(st)+'</span>'
+      + (r["處理備註"]?('　<span class="muted" style="font-size:11px">備註：'+esc(r["處理備註"])+'</span>'):"")
+      + '</div>';
+  }).join("");
+}
+function toggleOtPanel(){
+  attToggle("attApplyOtBody","attApplyOtCaret");
+}
+function toggleOtMy(){
+  attToggle("attQueryOtBody","attQueryOtCaret", function(){ if(State.att) queryMyOts(); else promptLogin("otMyList"); });
+}
+(function initOt(){
+  populateOtMyYear([]);
+  populateOtMyMonth();
+  var bs=$("btnOtSubmit"); if(bs) bs.addEventListener("click", submitOt);
+  var bm=$("btnOtMy"); if(bm) bm.addEventListener("click", queryMyOts);
+  var t1=$("attApplyOtToggle"); if(t1) t1.addEventListener("click", toggleOtPanel);
+  var t2=$("attQueryOtToggle"); if(t2) t2.addEventListener("click", toggleOtMy);
+  // 年/月變動時只重篩已抓回的資料，不必再打雲端
+  ["otMyYear","otMyMonth"].forEach(function(id){
+    var el=$(id); if(el) el.addEventListener("change", function(){ if((State.myOts||[]).length) renderMyOts(); });
+  });
+  ["otStart","otEnd","otRest"].forEach(function(id){
+    var el=$(id); if(el) el.addEventListener("change", updateOtHoursPreview);
+  });
+})();
+
+// 我的打卡初始化：年/月下拉預設本月、綁定查詢按鈕與展開開關
+(function initPunch(){
+  populatePunchMyYear();
+  populatePunchMyMonth();
+  var bp=$("btnPunchMy"); if(bp) bp.addEventListener("click", queryMyPunches);
+  var bt=$("attQueryPunchToggle"); if(bt) bt.addEventListener("click", togglePunchMy);
+})();
+
+loadEmpOptions(false);
+
+/* ============ 日期／時間輸入增強（2026-09-26 需求方）— 與主程式同款 ============
+   ① 日期 →「YYYY 年 MM 月 DD 日」三格，輸入滿自動跳下一格
+   ② 時間 →「HH : MM」兩格、一律 24 小時制（不依瀏覽器 locale、絕不出現 AM/PM）
+   原 input 保留 id 與 .value 語意（格式仍 YYYY-MM-DD / HH:MM），既有程式取值不必改。 */
+function enhanceDateTimeInputs(root){
+  var doc = root || document;
+  var desc0 = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+  function build(inp, kind){
+    if(!inp || inp.dataset.enhDone || !inp.parentNode) return;
+    var isDate = (kind === "date");
+    inp.dataset.enhDone = "1";
+    var spec = isDate
+      ? [{cls:"dty",n:4,ph:"YYYY"},{cls:"dtm",n:2,ph:"MM"},{cls:"dtd",n:2,ph:"DD"}]
+      : [{cls:"tmh",n:2,ph:"HH"},{cls:"tmm",n:2,ph:"MM"}];
+    var wrap = document.createElement("span");
+    wrap.className = isDate ? "dtgrp" : "tmgrp";
+    var els = [];
+    spec.forEach(function(p, i){
+      if(i > 0){
+        var sep = document.createElement("span");
+        sep.textContent = isDate ? (i === 1 ? "年" : "月") : ":";
+        wrap.appendChild(sep);
+      }
+      var el = document.createElement("input");
+      el.type = "text"; el.inputMode = "numeric";
+      el.className = p.cls; el.maxLength = p.n; el.placeholder = p.ph;
+      el.setAttribute("autocomplete","off");
+      wrap.appendChild(el); els.push(el);
+    });
+    if(isDate){ var tail = document.createElement("span"); tail.textContent = "日"; wrap.appendChild(tail); }
+    inp.parentNode.insertBefore(wrap, inp);
+    inp.style.display = "none";
+    function raw(){ return String(desc0.get.call(inp) || ""); }
+    function paint(){
+      var v = raw();
+      if(isDate){
+        var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v);
+        els[0].value = m ? m[1] : ""; els[1].value = m ? m[2] : ""; els[2].value = m ? m[3] : "";
+      } else {
+        var t = /^(\d{1,2}):(\d{2})/.exec(v);
+        els[0].value = t ? t[1].padStart(2,"0") : ""; els[1].value = t ? t[2] : "";
+      }
+    }
+    function commit(fire){
+      var g = function(i){ return els[i].value.replace(/\D/g,""); };
+      if(isDate){
+        var y = g(0), mo = g(1), d = g(2);
+        var ok = y.length === 4 && mo.length >= 1 && d.length >= 1
+              && Number(mo) >= 1 && Number(mo) <= 12 && Number(d) >= 1 && Number(d) <= 31;
+        desc0.set.call(inp, ok ? (y + "-" + mo.padStart(2,"0") + "-" + d.padStart(2,"0")) : "");
+      } else {
+        var h = g(0), mi = g(1);
+        if(h !== "" && Number(h) > 23) h = "23";
+        if(mi !== "" && Number(mi) > 59) mi = "59";
+        els[0].value = h; els[1].value = mi;
+        desc0.set.call(inp, (h.length === 2 && mi.length === 2) ? (h + ":" + mi) : "");
+      }
+      if(fire){
+        inp.dispatchEvent(new Event("input",  { bubbles:true }));
+        inp.dispatchEvent(new Event("change", { bubbles:true }));
+      }
+    }
+    Object.defineProperty(inp, "value", {
+      configurable: true,
+      get: function(){ return desc0.get.call(inp); },
+      set: function(v){ desc0.set.call(inp, (v == null ? "" : String(v))); paint(); }
+    });
+    els.forEach(function(el, i){
+      el.addEventListener("input", function(){
+        el.value = el.value.replace(/\D/g,"").slice(0, el.maxLength);
+        if(el.value.length >= el.maxLength && i < els.length - 1) els[i+1].focus();
+        commit(i === els.length - 1 && el.value.length >= el.maxLength);
+      });
+      el.addEventListener("blur",   function(){ commit(false); });
+      el.addEventListener("change", function(){ commit(false); });
+      el.addEventListener("keydown", function(ev){
+        if(ev.key === "Backspace" && el.value === "" && i > 0){ ev.preventDefault(); els[i-1].focus(); }
+        if(ev.key === "ArrowRight" && i < els.length - 1) els[i+1].focus();
+        if(ev.key === "ArrowLeft"  && i > 0) els[i-1].focus();
+      });
+    });
+    paint();
+  }
+  Array.prototype.forEach.call(doc.querySelectorAll('input[type="date"]'), function(x){ build(x, "date"); });
+  Array.prototype.forEach.call(doc.querySelectorAll('input[type="time"]'), function(x){ build(x, "time"); });
+}
+try { enhanceDateTimeInputs(); } catch(e){ console.warn("enhanceDateTimeInputs", e); }
+</script>
+</body>
+</html>
