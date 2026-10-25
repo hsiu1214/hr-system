@@ -1050,9 +1050,9 @@ function renderMyPunches(){
 // ===== 加班申請（google.script.run.otAdd）＋ 我的加班（otGetMy） =====
 // 與請假鏈同構（2026-09-25 階段二）。額外把關：
 //   ① 申請時段不得與當日「排班時段」重疊（排班內的工時不用申請，避免同一小時算兩次）
-//   ② 加班日起申請期限（測試期間暫不限制；常數 OT_WINDOW_DAYS，恢復時設回 7）
+//   ② 加班日起申請期限（常數 OT_WINDOW_DAYS＝7 天）
 //   ③ 結束須晚於開始（跨日加班請分兩筆）
-var OT_WINDOW_DAYS = 36500;   // ⚠ 測試期間暫時開放：不限申請期限（恢復時改回 7）
+var OT_WINDOW_DAYS = 7;   // 加班日起 7 天內須提出申請（❗與 GAS 同名常數必須一致，否則前端先擋就輪不到後端）
 function toMin(hm){
   var m=/^(\d{1,2}):(\d{2})$/.exec(String(hm==null?"":hm).trim());
   return m? (Number(m[1])*60+Number(m[2])) : NaN;

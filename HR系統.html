@@ -373,6 +373,7 @@
           <div class="fld"><span>店家緯度（主檔計算距離用）</span><input type="text" class="txt" id="pkLat" placeholder="如 25.0330"></div>
           <div class="fld"><span>店家經度</span><input type="text" class="txt" id="pkLng" placeholder="如 121.5654"></div>
           <div class="fld"><span>容許半徑 (公尺，僅供參考)</span><input type="number" class="txt" id="pkRadius" value="100" min="1"></div>
+          <div class="fld" style="grid-column:span 2"><span>雲端寫入權杖（選填；需與 GAS 指令碼屬性 <code>WRITE_TOKEN</code> 相同）</span><input type="password" class="txt" id="pkTok" placeholder="留空＝GAS 未設 WRITE_TOKEN，走相容模式（不驗證）" autocomplete="off"></div>
         </div>
         <div class="toolbar" style="margin-top:12px">
           <button class="btn" id="pkSaveCfg">儲存設定</button>
@@ -5293,6 +5294,11 @@ function setPunchUrl(v){
 }
 function getStoreCfg(){ try{ return JSON.parse(localStorage.getItem(PK_CFG)||"null"); }catch(e){ return null; } }
 function setStoreCfg(c){ try{ localStorage.setItem(PK_CFG, JSON.stringify(c)); }catch(e){} }
+/* 雲端寫入權杖（選用）。留空＝GAS 端未設 WRITE_TOKEN，走相容模式（不驗證）。
+   設定後，所有寫入 op 會自動帶 `tok`；讀取 op 不受影響。 */
+const PK_TOK = "hr_write_token";
+function getCloudTok(){ try{ const s=localStorage.getItem(PK_TOK); return s?String(s).trim():""; }catch(e){ return ""; } }
+function setCloudTok(v){ try{ localStorage.setItem(PK_TOK, String(v||"").trim()); }catch(e){} }
 function getVal(id){ const e=document.getElementById(id); return e?e.value:""; }
 function setVal(id,v){ const e=document.getElementById(id); if(e!=null) e.value=(v==null?"":v); }
 function setText(id,t){ const e=document.getElementById(id); if(e!=null) e.textContent=t; }
@@ -5307,12 +5313,15 @@ function escXml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").
 function colLetter(n){ let s=""; while(n>0){ const m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; }
 function isPunchNumCol(c){ return ["紀錄編號","緯度","經度","距離"].includes(c); }
 
-/* 雲端讀取（JSONP，跨域） */
+/* 雲端讀取（JSONP，跨域）。已設寫入權杖時一併帶上 `tok`（讀取 op 用不到，但同一支函式共用，
+   GAS 端只對寫入 op 驗證，多帶無害）。 */
 function cloudGet(op, params, cb){
   const base=getPunchUrl();
   if(!base) return cb(new Error("未設定 Apps Script 網址"));
   const cbName="__hrpcb"+Date.now()+Math.floor(Math.random()*1e6);
-  const qs=(Object.entries(params||{}).map(([k,v])=>encodeURIComponent(k)+"="+encodeURIComponent(v)).join("&"));
+  const all=Object.assign({}, params||{});
+  const tk=getCloudTok(); if(tk && all.tok==null) all.tok=tk;
+  const qs=(Object.entries(all).map(([k,v])=>encodeURIComponent(k)+"="+encodeURIComponent(v)).join("&"));
   const url=base+(base.includes("?")?"&":"?")+"op="+encodeURIComponent(op)+(qs?"&"+qs:"")+"&callback="+cbName;
   const sc=document.createElement("script");
   const to=setTimeout(()=>{ cleanup(); cb(new Error("雲端逾時")); }, 12000);
@@ -5322,12 +5331,17 @@ function cloudGet(op, params, cb){
   sc.src=url;
   document.head.appendChild(sc);
 }
-/* 雲端寫入（no-cors text/plain POST，跨域不觸發預檢） */
+/* 雲端寫入（no-cors text/plain POST，跨域不觸發預檢）。
+   ❗no-cors 讀不到回應 → 權杖錯誤時畫面**不會**顯示錯誤（寫入靜默失敗）。
+   啟用權杖後若發現「按了但雲端沒資料」，先用「測試雲端連線」確認權杖是否正確。 */
 async function cloudPost(op, payload){
   const base=getPunchUrl();
   if(!base) throw new Error("未設定 Apps Script 網址");
   const url=base+(base.includes("?")?"&":"?")+"op="+encodeURIComponent(op);
-  await fetch(url, {method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain;charset=utf-8"}, body: JSON.stringify(payload)});
+  const tk=getCloudTok();
+  const body=(tk && payload && typeof payload==="object" && !Array.isArray(payload))
+    ? Object.assign({}, payload, { tok:tk }) : payload;
+  await fetch(url, {method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain;charset=utf-8"}, body: JSON.stringify(body)});
   return true;
 }
 /* 員工名冊（含 PIN）：優先雲端，否則本機主檔 */
@@ -5337,12 +5351,14 @@ function renderCloudCfg(){
   const cfg=getStoreCfg();
   if(cfg){ if(cfg.lat!=null) setVal("pkLat",cfg.lat); if(cfg.lng!=null) setVal("pkLng",cfg.lng); if(cfg.radius) setVal("pkRadius",cfg.radius); }
   const url=getPunchUrl(); setVal("pkUrl",url);
+  setVal("pkTok", getCloudTok());
 }
 
 function pkSaveCfg(){
   const lat=parseFloat(getVal("pkLat")), lng=parseFloat(getVal("pkLng")), radius=parseInt(getVal("pkRadius"),10)||100;
   setStoreCfg({ lat:isNaN(lat)?null:lat, lng:isNaN(lng)?null:lng, radius });
   setPunchUrl(getVal("pkUrl").trim());
+  setCloudTok(getVal("pkTok"));
   showMsg("pkCfgNote","已儲存設定。","ok");
 }
 /* 雲端「員工」分頁應有的欄位＝GAS `EMP_COLS` 的鏡像（名稱與順序都要一致）。
@@ -5398,12 +5414,20 @@ function pkTestCloud(){
         if(!okVer) whyLack="· 員工分頁只有 <b>"+ec+"</b> 欄，少於新版 <b>"+need+"</b> 欄<br>";
       }
       if(okVer){
+        // 寫入權杖狀態（只回布林）：雲端已啟用但本機沒填/填錯 → 讀取正常、寫入會全部被拒，
+        //   而 no-cors POST 讀不到回應 → 使用者只會看到「按了沒反應」，故必須在這裡就講清楚。
+        const tokOn=!!(data&&data.tokOn), tokOk=!!(data&&data.tokOk);
+        const tokTxt = !tokOn
+          ? "寫入權杖：<b>未啟用</b>（任何知道網址的人都能寫入；建議在 GAS 指令碼屬性設 <code>WRITE_TOKEN</code>）"
+          : (tokOk ? "寫入權杖：<b>已啟用且正確</b> ✅"
+                   : "寫入權杖：<b>雲端已啟用，但本機的權杖錯誤或未填</b> ❌ → 上傳／核准等寫入動作會全部被拒");
         showMsg("pkCfgNote",
           "雲端連線正常 ✅ 員工分頁 <b>"+colTxt+"</b>／名單 <b>"+n+"</b> 位<br>"
           + "雲端檔案：<b>"+esc((data&&data.name)?data.name:"未知")+"</b><br>"
-          + "GAS 版本：<b>"+esc(ver)+"</b>"
+          + "GAS 版本：<b>"+esc(ver)+"</b><br>"
+          + tokTxt
           + (rows.length? "" : "<br>（雲端目前沒有員工，欄位以 health 回報判定）"),
-          "ok");
+          (tokOn&&!tokOk)?"err":"ok");
         return;
       }
       showMsg("pkCfgNote",

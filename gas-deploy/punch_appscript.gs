@@ -71,7 +71,7 @@ const OT_COLS  = ["序號","員工編號","姓名","加班日期","開始時間"
                   "休息時數"];   // 2026-09-25 新增：選填（小時）；刻意放「最右」＝既有分頁欄位不位移（舊列視為 0）
 const OT_DATE_COLS  = ["加班日期"];                            // → yyyy-MM-dd
 const OT_STAMP_COLS = ["申請時間","處理時間","刪除時間"];        // → yyyy-MM-dd HH:mm:ss
-const OT_WINDOW_DAYS = 36500;   // ⚠ 測試期間暫時開放：不限申請期限（恢復時改回 7）；以伺服器日期為準
+const OT_WINDOW_DAYS = 7;   // 加班日起 7 天內須提出申請（加班申請期限）；以伺服器日期為準。❗手機端 PunchPage 同名常數須同步
 
 // 補休（逐筆帳；階段三 2026-09-26）：單一分頁「補休」，與加班鏈同構。
 // 每筆「加班補休」核准後由主檔產生（主檔算 折現權數〔加權時數〕/到期日/基準時薪 後寫入本端；可休時數＝時數 1:1）；
@@ -176,7 +176,35 @@ function setMonthClose(enabled){
   MONTH_CLOSE_ENABLED = v;   // 本次執行立即生效（下一個請求會從 ScriptProperties 重讀）
   return { ok:true, enabled: v };
 }
-// 規則（啟用時）：資料所屬月份 M 的「次月 5 日（發薪日）」00:00 起，該月一律不得再寫入（薪資已發放）。
+// ========== 寫入權杖守門（2026-10-25 新增；**選用，預設不啟用**）==========
+// 目的：`doGet`/`doPost` 的寫入 op（排班上傳、核准/退回、匯入員工、月結鎖定…）
+//       原本**匿名可呼叫**——只要知道 /exec 網址就能改資料。
+// 機制：GAS 指令碼屬性 `WRITE_TOKEN` 一旦設定，所有寫入 op 必須帶相同的 `tok` 才放行。
+//   · `WRITE_TOKEN` **未設定（空字串）→ 不啟用**，行為與舊版完全相同（不會弄壞現有部署）。
+//   · 啟用方式：Apps Script → 專案設定 → 指令碼屬性 → 新增 `WRITE_TOKEN`＝自訂長亂數。
+//   · 前端對應：主系統「設定 → 雲端中繼設定 → 雲端寫入權杖」填同一組值（存本機瀏覽器）。
+// 範圍限制（重要）：
+//   · 手機端走 `google.script.run`（直接呼叫函式），**不經過這裡**，因此不受權杖影響；
+//     員工寫入的防線是 PIN 驗證，而不是共用權杖（共用權杖會寫在手機頁 HTML 裡，等於公開）。
+//   · 權杖走網址 query（JSONP 只能用 GET）→ 會留在瀏覽器歷史與伺服器日誌，
+//     故它是「擋掉不知情的掃描者」而非「抗攔截的加密憑證」。
+var WRITE_OPS_ = { setschedule:1, addleave:1, setleave:1, addot:1, setot:1,
+                   adcomp:1, setcomp:1, addpunch:1, addpunches:1, setemps:1, setMonthClose:1 };
+function getWriteToken(){
+  try { return PropertiesService.getScriptProperties().getProperty("WRITE_TOKEN") || ""; }
+  catch(e){ return ""; }
+}
+/* 回傳 null＝放行；回傳物件＝拒絕對象（呼叫端直接輸出）。
+   got 可能來自 query（doGet）或 payload（doPost）。 */
+function writeDenied_(got){
+  var need = getWriteToken();
+  if(!need) return null;                       // 未設定 → 不啟用（相容）
+  if(String(got == null ? "" : got) === need) return null;
+  return { ok:false, error:"寫入被拒：缺少或錯誤的寫入權杖（tok）。" +
+           "請在主系統「設定 → 雲端中繼設定 → 雲端寫入權杖」填入與 GAS 指令碼屬性 WRITE_TOKEN 相同的值。" };
+}
+
+// 月結鎖定（MONTH_CLOSE_ENABLED）規則（啟用時）：資料所屬月份 M 的「次月 5 日（發薪日）」00:00 起，該月一律不得再寫入（薪資已發放）。
 //   · 判定用「**資料所屬日期**」，不是「送出當下」——
 //       9/20 的加班在 10/6 送出 → 擋（9 月已關）；10/3 的加班在 10/6 送出 → 放行（10 月窗口開到 11/4）。
 //   · 只擋「申請／補登／排班上傳」等寫入；核准／退回／折現（setLeave／setOt／setComp）**不擋**。
@@ -392,7 +420,7 @@ function setLeave(no, status, note){
 
 // ---------- 加班（雲端中繼；單一分頁「加班」，全月份 append） ----------
 // 與請假鏈完全同構（設計規格《加班申請制_設計規格.md》§五）。
-// 服務端守門（輕量）：序號/員工編號/加班日期/時數必填＋「加班日起申請期限」（測試期間暫不限制；OT_WINDOW_DAYS 恢復時設回 7）
+// 服務端守門（輕量）：序號/員工編號/加班日期/時數必填＋「加班日起申請期限」（OT_WINDOW_DAYS＝7 天）
 //   以**伺服器日期**為準（手機時鐘不準也不影響；未來日期＝預先申請，不受限）。
 // 與排班時段的重疊檢查在**手機端**送出前做（格子解析邏輯已存在手機頁；
 //   本端點本無驗證，真正的把關是主檔核准 UI——核准權在僱主）。
@@ -722,10 +750,19 @@ function compSet(no, status, note, cash){ ensureSheets(); return setComp(no, sta
 // ---------- 對外：HTTP 端點（主系統讀取 / 舊版寫入） ----------
 function doGet(e){
   const op = (e && e.parameter && e.parameter.op) || "";
+  // 寫入類 op 須通過寫入權杖（GAS 指令碼屬性 WRITE_TOKEN 未設定＝不啟用，行為同舊版）
+  if(WRITE_OPS_[op]){
+    const denied = writeDenied_(e && e.parameter && e.parameter.tok);
+    if(denied) return jsonpOut(e, denied);
+  }
   if(op === "health"){
     let ssName = "";
     try { ssName = getSS().getName(); } catch(err) { ssName = ""; }   // 回傳綁定的試算表檔名，讓主系統測試連線時能確認連到哪個檔案
-    return jsonpOut(e, { ok:true, time:new Date().toISOString(), v:GAS_VERSION, empCols:EMP_COLS.length, empColsList:EMP_COLS.slice(), otCols:OT_COLS.length, compCols:COMP_COLS.length, name:ssName });
+    // 寫入權杖狀態（只回布林，不回權杖本身）：tokOn＝雲端是否已啟用；tokOk＝本次帶的 tok 是否正確（未啟用時為 null）
+    const _wt = getWriteToken();
+    const _tokOn = !!_wt;
+    const _tokOk = _tokOn ? (String((e && e.parameter && e.parameter.tok) || "") === _wt) : null;
+    return jsonpOut(e, { ok:true, time:new Date().toISOString(), v:GAS_VERSION, empCols:EMP_COLS.length, empColsList:EMP_COLS.slice(), otCols:OT_COLS.length, compCols:COMP_COLS.length, name:ssName, tokOn:_tokOn, tokOk:_tokOk });
   }
   if(op === "emps"){ ensureSheets(); return jsonpOut(e, readEmpsPublic()); }
   // 手機登入驗證：員工編號＋PIN 交由伺服器比對（前端不再取得 PIN 清單）
@@ -811,6 +848,9 @@ function doPost(e){
   let payload = {};
   try { payload = JSON.parse((e && e.postData && e.postData.contents) ? e.postData.contents : "{}"); }
   catch(err){ payload = {}; }
+  // doPost 的 op 全部都是寫入 → 一律檢查寫入權杖（tok 可放 query 或 JSON body）
+  { const denied = writeDenied_((e && e.parameter && e.parameter.tok) || (payload && payload.tok));
+    if(denied) return jsonOut(denied); }
   if(op === "addpunch"){ ensureSheets(); const rec = payload.record || payload; return jsonOut(appendPunch(rec)); }
   if(op === "setemps"){ ensureSheets(); writeEmps(payload.rows || []); return jsonOut({ ok:true, n:(payload.rows || []).length }); }
   if(op === "setschedule"){ ensureSheets(); return jsonOut(writeSchedule(payload.ym, payload.rows || [], { start:(payload.start !== false) })); }
@@ -828,8 +868,13 @@ function doPost(e){
 function jsonOut(obj){
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
+/* JSONP 輸出。`callback` 來自網址，屬**不可信輸入** → 必須白名單：
+   只接受合法 JS 識別字（1~64 字元、首字非數字）。不符者視同未提供，回純 JSON。
+   不驗證的後果：`?callback=alert(1)//` 會讓端點變成反射型 XSS 載體。
+   主系統產生的名字是 `__hrpcb<時間戳><亂數>`，必定通過。 */
 function jsonpOut(e, obj){
   const cb = (e && e.parameter && e.parameter.callback);
-  if(cb) return ContentService.createTextOutput(cb + "(" + JSON.stringify(obj) + ")").setMimeType(ContentService.MimeType.JAVASCRIPT);
+  const safe = cb && /^[A-Za-z_$][A-Za-z0-9_$]{0,63}$/.test(String(cb));
+  if(safe) return ContentService.createTextOutput(cb + "(" + JSON.stringify(obj) + ")").setMimeType(ContentService.MimeType.JAVASCRIPT);
   return jsonOut(obj);
 }
